@@ -25,8 +25,8 @@ In Atomic Agents, an agent is composed of several key components:
 Here's a high-level architecture diagram:
 
 <!-- ![alt text](./.assets/architecture_highlevel_overview.png) -->
-<img src="./.assets/architecture_highlevel_overview.png" alt="High-level architecture overview of Atomic Agents" width="600"/>
-<img src="./.assets/what_is_sent_in_prompt.png" alt="Diagram showing what is sent to the LLM in the prompt" width="600"/>
+<img src="https://github.com/AtomicAgents/atomic-agents/blob/main/.assets/architecture_highlevel_overview.png" alt="High-level architecture overview of Atomic Agents" width="600"/>
+<img src="https://github.com/AtomicAgents/atomic-agents/raw/main/.assets/what_is_sent_in_prompt.png" alt="Diagram showing what is sent to the LLM in the prompt" width="600"/>
 
 For more details please read from the original website.
 
