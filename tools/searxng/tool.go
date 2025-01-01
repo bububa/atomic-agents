@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
+	"sync"
 
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools"
@@ -14,6 +16,7 @@ import (
 type Category = string
 
 const (
+	EmptyCategory       Category = ""
 	GeneralCategory     Category = "general"
 	NewsCategory        Category = "news"
 	SocialMediaCategory Category = "social_media"
@@ -25,14 +28,11 @@ type Input struct {
 	schema.Base
 	// Queries list of search queries.
 	Queries []string `json:"queries" jsonschema:"title=queries,description=List of search queries." validate:"required"`
-	// Category: Category of the search queries."
+	// Category: Category of the search queries.
 	Category Category `json:"category,omitempty" jsonschema:"title=category,enum=general,enum=news,enum=social_media,default=general,description=Category of the search queries."`
 }
 
 func NewInput(category Category, queries []string) *Input {
-	if category == "" {
-		category = GeneralCategory
-	}
 	return &Input{
 		Queries:  queries,
 		Category: category,
@@ -55,6 +55,14 @@ type SearchResultItem struct {
 	Content string `json:"content,omitempty" jsonschema:"title=content,description=The content snippet of the search result"`
 	// Query The query used to obtain this search result
 	Query string `json:"query" jsonschema:"title=query,description=The query used to obtain this search result" validate:"required"`
+	// Category: Category of the search queries.
+	Category Category `json:"category,omitempty" jsonschema:"title=category,enum=general,enum=news,enum=social_media,default=general,description=Category of the search queries."`
+	// Metadata search result metadata
+	Metadata string `json:"metadata,omitempty" jsonschema:"title=metadata,description=The metadata of the search result"`
+	// PublishedDate The published date of the search result
+	PublishedDate string `json:"publishedDate,omitempty" jsonschema:"title=published_date,description=The published date of the search result"`
+	// Score search result score
+	Score float64 `json:"score,omitempty" jsonschema:"title=score,description=The score of the search result"`
 }
 
 func (s SearchResultItem) String() string {
@@ -76,6 +84,13 @@ type Output struct {
 	Results []SearchResultItem `json:"results,omitempty" jsonschema:"title=results,description=List of search result items"`
 	// Category The category of the search results
 	Category Category `json:"category,omitempty" jsonschema:"title=category,enum=general,enum=news,enum=social_media,default=general,description=Category of the search results."`
+}
+
+func NewOutput(results []SearchResultItem, category Category) *Output {
+	return &Output{
+		Results:  results,
+		Category: category,
+	}
 }
 
 func (s Output) String() string {
@@ -102,7 +117,7 @@ func NewSearxngSearch(opts ...Option) *SearxngSearch {
 		opt(&ret.Config)
 	}
 	if ret.Title() == "" {
-		ret.SetTitle("WebscraperTool")
+		ret.SetTitle("SearxngSearchTool")
 	}
 	if ret.maxResults == 0 {
 		ret.maxResults = 10
@@ -115,6 +130,46 @@ func NewSearxngSearch(opts ...Option) *SearxngSearch {
 
 // Run Runs the SearxNGTool synchronously with the given parameters
 func (t *SearxngSearch) Run(ctx context.Context, input *Input) (*Output, error) {
+	list := make([]SearchResultItem, 0, len(input.Queries)*t.maxResults)
+	var (
+		wg   = new(sync.WaitGroup)
+		lock = new(sync.Mutex)
+	)
+	for _, query := range input.Queries {
+		wg.Add(1)
+		go func(ctx context.Context, query string, category Category) {
+			defer wg.Done()
+			results, _ := t.fetchSearchResults(ctx, query, category)
+			lock.Lock()
+			list = append(list, results...)
+			lock.Unlock()
+		}(ctx, query, input.Category)
+	}
+	wg.Wait()
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Score > list[j].Score
+	})
+	l := len(list)
+	unique := make(map[string]struct{}, l)
+	results := make([]SearchResultItem, 0, l)
+	for _, v := range list {
+		if v.URL == "" || v.Content == "" || v.Title == "" {
+			continue
+		}
+		if _, found := unique[v.URL]; found {
+			continue
+		}
+		if input.Category != EmptyCategory && input.Category != v.Category {
+			continue
+		}
+		results = append(results, v)
+		unique[v.URL] = struct{}{}
+	}
+	maxResults := t.maxResults
+	if len(results) > maxResults {
+		results = results[:maxResults]
+	}
+	return NewOutput(results, input.Category), nil
 }
 
 // fetchSearchResults queries the local search engine and returns the parsed search response
@@ -128,7 +183,7 @@ func (t *SearxngSearch) fetchSearchResults(ctx context.Context, query string, ca
 	if t.language != "" {
 		values.Set("language", t.language)
 	}
-	if category != "" {
+	if category != EmptyCategory {
 		values.Set("categories", category)
 	}
 	searchURL := fmt.Sprintf("%s/search?%s", t.baseURL, values.Encode())
