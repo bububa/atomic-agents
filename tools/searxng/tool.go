@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/bububa/atomic-agents/schema"
@@ -70,16 +71,12 @@ func (s SearchResultItem) String() string {
 	return string(bs)
 }
 
-// SearchResponse represents the entire response from the local search engine
-type SearchResponse struct {
-	Query           string             `json:"query"`
-	NumberOfResults int                `json:"number_of_results"`
-	Results         []SearchResultItem `json:"results"`
-}
-
 // Output represents the output of the SearxNG search tool.
+// the schema implements SystemPromptContextProvider
 type Output struct {
 	schema.Base
+	// Query The query used to obtain this search result
+	Query string `json:"query,omitempty" jsonschema:"title=query,description=The query used to obtain this search result"`
 	// Results List of search result items
 	Results []SearchResultItem `json:"results,omitempty" jsonschema:"title=results,description=List of search result items"`
 	// Category The category of the search results
@@ -96,6 +93,32 @@ func NewOutput(results []SearchResultItem, category Category) *Output {
 func (s Output) String() string {
 	bs, _ := json.Marshal(s)
 	return string(bs)
+}
+
+// Title implements SystemPromptContextProvider interface
+func (s Output) Title() string {
+	return fmt.Sprintf("Search Results for %s", s.Query)
+}
+
+// Info implements SystemPromptContextProvider interface
+func (s Output) Info() string {
+	parts := make([]string, 0, len(s.Results))
+	for _, v := range s.Results {
+		lines := make([]string, 0, 4)
+		lines = append(lines, fmt.Sprintf("TITLE: %s", v.Title))
+		lines = append(lines, fmt.Sprintf("URL: %s", v.URL))
+		lines = append(lines, fmt.Sprintf("CONTENT: %s", v.Content))
+		if v.PublishedDate != "" {
+			lines = append(lines, fmt.Sprintf("PUBLISHED DATE: %s", v.PublishedDate))
+		}
+		if v.Metadata != "" {
+			lines = append(lines, fmt.Sprintf("METADATA: %s", v.Metadata))
+		}
+		lines = append(lines, "")
+		parts = append(parts, strings.Join(lines, "\n"))
+	}
+	parts = append(parts, "")
+	return strings.Join(parts, "\n")
 }
 
 type Config struct {
@@ -202,13 +225,13 @@ func (t *SearxngSearch) fetchSearchResults(ctx context.Context, query string, ca
 		return nil, fmt.Errorf("non-200 response from search engine: %d", httpResp.StatusCode)
 	}
 
-	var searchResponse SearchResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&searchResponse); err != nil {
+	var searchResult Output
+	if err := json.NewDecoder(httpResp.Body).Decode(&searchResult); err != nil {
 		return nil, err
 	}
-	for idx := range searchResponse.Results {
-		searchResponse.Results[idx].Query = query
+	for idx := range searchResult.Results {
+		searchResult.Results[idx].Query = query
 	}
 
-	return searchResponse.Results, nil
+	return searchResult.Results, nil
 }

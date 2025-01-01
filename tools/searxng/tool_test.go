@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func startSearxngServer(t *testing.T, port int, results *SearchResponse) *http.Server {
+func startSearxngServer(t *testing.T, port int, results *Output) *http.Server {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		buf := new(bytes.Buffer)
 		json.NewEncoder(buf).Encode(results)
@@ -38,7 +38,7 @@ func TestSearxngSearchWithCategory(t *testing.T) {
 		Content:  "This is a test result content with category.",
 		Category: NewsCategory,
 	}
-	mockResult := SearchResponse{
+	mockResult := Output{
 		Results: []SearchResultItem{mockItem},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -76,7 +76,7 @@ func TestSearxngSearchMissingFields(t *testing.T) {
 	mockPort := 8080
 	mockSearchURL := fmt.Sprintf("http://localhost:%d", mockPort)
 	mockQuery := "query with missing fields"
-	mockResult := SearchResponse{
+	mockResult := Output{
 		Results: []SearchResultItem{
 			{Title: "Result Missing Content", URL: "https://example.com/1", Query: mockQuery},
 			{Content: "Result Missing Title", URL: "https://example.com/2", Query: mockQuery},
@@ -113,7 +113,7 @@ func TestSearxngSearchWithMetadataAndPublishedDate(t *testing.T) {
 	mockPort := 8080
 	mockSearchURL := fmt.Sprintf("http://localhost:%d", mockPort)
 	mockQuery := "query with dates"
-	mockResult := SearchResponse{
+	mockResult := Output{
 		Results: []SearchResultItem{
 			{Title: "Result with Metadata", URL: "https://example.com/metadata", Content: "Content with metadata", Query: mockQuery, Metadata: "2021-01-01"},
 			{Title: "Result with Published Date", Content: "Content with published date", URL: "https://example.com/published-data", Query: mockQuery, PublishedDate: "2022-01-01"},
@@ -154,7 +154,7 @@ func TestSearxngSearchWithMaxResults(t *testing.T) {
 	mockPort := 8080
 	mockSearchURL := fmt.Sprintf("http://localhost:%d", mockPort)
 	mockQuery := "query with max results"
-	mockResult := SearchResponse{
+	mockResult := Output{
 		Results: []SearchResultItem{
 			{Title: "Result with Metadata", URL: "https://example.com/metadata", Content: "Content with metadata", Query: mockQuery, Metadata: "2021-01-01"},
 			{Title: "Result with Published Date", Content: "Content with published date", URL: "https://example.com/published-data", Query: mockQuery, PublishedDate: "2022-01-01"},
@@ -182,7 +182,7 @@ func TestSearxngSearchWithNoResults(t *testing.T) {
 	mockPort := 8080
 	mockSearchURL := fmt.Sprintf("http://localhost:%d", mockPort)
 	mockQuery := "query with max results"
-	mockResult := SearchResponse{
+	mockResult := Output{
 		Results: []SearchResultItem{},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
