@@ -1,7 +1,5 @@
 package schema
 
-import "encoding/json"
-
 // Input implements BaseAgentInputSchema
 // This schema represents the input from the user to the AI agent.
 type Input struct {
@@ -17,17 +15,10 @@ func NewInput(chatMessage string) *Input {
 	return ret
 }
 
-// String implements Schema interface
-func (s Input) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
-// Snapshot implements Schema interface
-func (s Input) Snapshot() Schema {
+// CreateeInput returns a BaseAgentInput
+func CreateInput(chatMessage string) Input {
 	return Input{
-		Base:        s.Base,
-		ChatMessage: s.ChatMessage,
+		ChatMessage: chatMessage,
 	}
 }
 
@@ -47,16 +38,9 @@ func NewOutput(chatMessage string) *Output {
 	return ret
 }
 
-// String implements Schema interface
-func (s Output) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
-// Snapshot implements Schema interface
-func (s Output) Snapshot() Schema {
+// CreateOutput returns a BaseAgentOutput
+func CreateOutput(chatMessage string) Output {
 	return Output{
-		Base:        s.Base,
-		ChatMessage: s.ChatMessage,
+		ChatMessage: chatMessage,
 	}
 }

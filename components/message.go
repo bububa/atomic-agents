@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"net/http"
 
+	cohere "github.com/cohere-ai/cohere-go/v2"
+	"github.com/gabriel-vasile/mimetype"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	"github.com/rs/xid"
 	openai "github.com/sashabaranov/go-openai"
@@ -30,6 +33,68 @@ const (
 	ToolRole      MessageRole = "tool"
 	FunctionRole  MessageRole = "function"
 )
+
+// ApiResponse instructor provider chat response
+type ApiResponse struct {
+	ID        string      `json:"id,omitempty"`
+	Role      MessageRole `json:"role,omitempty"`
+	Model     string      `json:"model,omitempty"`
+	Useage    *ApiUseage  `json:"usage,omitempty"`
+	Timestamp int64       `json:"ts,omitempty"`
+	Details   any         `json:"content,omitempty"`
+}
+
+// FromOpenAI convnert response from openai
+func (r *ApiResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
+	r.ID = v.ID
+	r.Role = AssistantRole
+	r.Model = v.Model
+	r.Useage = &ApiUseage{
+		InputTokens:  v.Usage.PromptTokens,
+		OutputTokens: v.Usage.CompletionTokens,
+	}
+	r.Details = v.Choices
+}
+
+// FromAnthropic convert response from anthropic
+func (r *ApiResponse) FromAnthropic(v *anthropic.MessagesResponse) {
+	r.ID = v.ID
+	r.Role = AssistantRole
+	r.Model = string(v.Model)
+	r.Useage = &ApiUseage{
+		InputTokens:  v.Usage.InputTokens,
+		OutputTokens: v.Usage.OutputTokens,
+	}
+	r.Details = v.Content
+}
+
+// FromCohere convert response from cohere
+func (r *ApiResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
+	if v.GenerationId != nil {
+		r.ID = *v.GenerationId
+	}
+	r.Role = AssistantRole
+	if meta := v.Meta; meta != nil {
+		if useage := meta.Tokens; useage != nil {
+			r.Useage = new(ApiUseage)
+			if useage.InputTokens != nil {
+				r.Useage.InputTokens = int(*useage.InputTokens)
+			}
+			if useage.OutputTokens != nil {
+				r.Useage.OutputTokens = int(*useage.OutputTokens)
+			}
+		}
+		if version := meta.ApiVersion; version != nil {
+			r.Model = version.Version
+		}
+	}
+	r.Details = v
+}
+
+type ApiUseage struct {
+	InputTokens  int `json:"input_tokens,omitempty"`
+	OutputTokens int `json:"output_tokens,omitempty"`
+}
 
 // Message  Represents a message in the chat history.
 //
@@ -86,7 +151,7 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
 		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
 			Type: openai.ChatMessagePartTypeText,
-			Text: m.content.String(),
+			Text: schema.Stringify(m.content),
 		})
 		for _, imageURL := range attachement.ImageURLs {
 			dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
@@ -97,29 +162,64 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
 			})
 		}
 	} else {
-		dist.Content = m.content.String()
+		dist.Content = schema.Stringify(m.content)
 	}
 }
 
 // ToAnthropic convert message to anthropic Message
 func (m Message) ToAnthropic(dist *anthropic.Message) {
-	dist.Role = m.role
-	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
+	dist.Role = anthropic.ChatRole(m.role)
+	if attachement := m.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
 		images := getImages(attachement.ImageURLs)
-		dist.Content = make([]anthropic.MessageContent, 0, len(images)+1)
+		dist.Content = make([]anthropic.MessageContent, 0, len(images)+len(attachement.Files)+1)
 		buf := new(bytes.Buffer)
 		for _, img := range images {
+			buf.Reset()
 			png.Encode(buf, img)
 			encodedString := base64.StdEncoding.EncodeToString(buf.Bytes())
-			imgSource := anthropic.MessageContentImageSource{
+			imgSource := anthropic.MessageContentSource{
 				Type:      "base64",
 				MediaType: "image/png",
 				Data:      fmt.Sprintf("data:image/png;base64,%s", encodedString),
 			}
 			dist.Content = append(dist.Content, anthropic.NewImageMessageContent(imgSource))
 		}
+		for _, f := range attachement.Files {
+			buf.Reset()
+			tee := io.TeeReader(f, buf)
+			mimeType, _ := mimetype.DetectReader(tee)
+			encodedString := base64.StdEncoding.EncodeToString(buf.Bytes())
+			docSource := anthropic.MessageContentSource{
+				Type:      "base64",
+				MediaType: mimeType.String(),
+				Data:      fmt.Sprintf("data:%s;base64,%s", mimeType.String(), encodedString),
+			}
+			dist.Content = append(dist.Content, anthropic.NewDocumentMessageContent(docSource))
+		}
 	}
-	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(m.content.String())}
+	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(schema.Stringify(m.content))}
+}
+
+// ToCohere convert message to cohere Message
+func (m Message) ToCohere(dist *cohere.Message) {
+	dist.Role = m.role
+	switch m.role {
+	case SystemRole:
+		dist.Role = "SYSTEM"
+		dist.System = &cohere.ChatMessage{
+			Message: schema.Stringify(m.content),
+		}
+	case AssistantRole:
+		dist.Role = "CHATBOT"
+		dist.System = &cohere.ChatMessage{
+			Message: schema.Stringify(m.content),
+		}
+	case UserRole:
+		dist.Role = "USER"
+		dist.User = &cohere.ChatMessage{
+			Message: schema.Stringify(m.content),
+		}
+	}
 }
 
 func getImages(urls []string) []image.Image {

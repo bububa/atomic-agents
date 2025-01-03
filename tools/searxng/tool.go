@@ -40,11 +40,6 @@ func NewInput(category Category, queries []string) *Input {
 	}
 }
 
-func (s Input) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
 // SearchResultItem represents a single search result item
 type SearchResultItem struct {
 	schema.Base
@@ -66,11 +61,6 @@ type SearchResultItem struct {
 	Score float64 `json:"score,omitempty" jsonschema:"title=score,description=The score of the search result"`
 }
 
-func (s SearchResultItem) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
 // Output represents the output of the SearxNG search tool.
 // the schema implements SystemPromptContextProvider
 type Output struct {
@@ -83,16 +73,12 @@ type Output struct {
 	Category Category `json:"category,omitempty" jsonschema:"title=category,enum=general,enum=news,enum=social_media,default=general,description=Category of the search results."`
 }
 
-func NewOutput(results []SearchResultItem, category Category) *Output {
+func NewOutput(query string, results []SearchResultItem, category Category) *Output {
 	return &Output{
+		Query:    query,
 		Results:  results,
 		Category: category,
 	}
-}
-
-func (s Output) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
 }
 
 // Title implements SystemPromptContextProvider interface
@@ -129,13 +115,13 @@ type Config struct {
 	httpClient *http.Client
 }
 
-// SearxngSearch is a tool for performing searches on SearxNG based on the provided queries and category.
-type SearxngSearch struct {
+// Tool is a tool for performing searches on SearxNG based on the provided queries and category.
+type Tool struct {
 	Config
 }
 
-func NewSearxngSearch(opts ...Option) *SearxngSearch {
-	ret := new(SearxngSearch)
+func New(opts ...Option) *Tool {
+	ret := new(Tool)
 	for _, opt := range opts {
 		opt(&ret.Config)
 	}
@@ -152,7 +138,7 @@ func NewSearxngSearch(opts ...Option) *SearxngSearch {
 }
 
 // Run Runs the SearxNGTool synchronously with the given parameters
-func (t *SearxngSearch) Run(ctx context.Context, input *Input) (*Output, error) {
+func (t *Tool) Run(ctx context.Context, input *Input) (*Output, error) {
 	list := make([]SearchResultItem, 0, len(input.Queries)*t.maxResults)
 	var (
 		wg   = new(sync.WaitGroup)
@@ -182,7 +168,7 @@ func (t *SearxngSearch) Run(ctx context.Context, input *Input) (*Output, error) 
 		if _, found := unique[v.URL]; found {
 			continue
 		}
-		if input.Category != EmptyCategory && input.Category != v.Category {
+		if input.Category != EmptyCategory && v.Category != "" && input.Category != v.Category {
 			continue
 		}
 		results = append(results, v)
@@ -192,11 +178,11 @@ func (t *SearxngSearch) Run(ctx context.Context, input *Input) (*Output, error) 
 	if len(results) > maxResults {
 		results = results[:maxResults]
 	}
-	return NewOutput(results, input.Category), nil
+	return NewOutput(strings.Join(input.Queries, ", "), results, input.Category), nil
 }
 
 // fetchSearchResults queries the local search engine and returns the parsed search response
-func (t *SearxngSearch) fetchSearchResults(ctx context.Context, query string, category Category) ([]SearchResultItem, error) {
+func (t *Tool) fetchSearchResults(ctx context.Context, query string, category Category) ([]SearchResultItem, error) {
 	// Encode the query parameter
 	values := url.Values{}
 	values.Set("q", query)

@@ -46,7 +46,7 @@ func TestSearxngSearchWithCategory(t *testing.T) {
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
-	tool := NewSearxngSearch(WithBaseURL(mockSearchURL))
+	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(NewsCategory, []string{mockQuery})
 	result, err := tool.Run(ctx, input)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestSearxngSearchMissingFields(t *testing.T) {
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
-	tool := NewSearxngSearch(WithBaseURL(mockSearchURL))
+	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(EmptyCategory, []string{mockQuery})
 	result, err := tool.Run(ctx, input)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestSearxngSearchWithMetadataAndPublishedDate(t *testing.T) {
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
-	tool := NewSearxngSearch(WithBaseURL(mockSearchURL))
+	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(EmptyCategory, []string{mockQuery})
 	result, err := tool.Run(ctx, input)
 	if err != nil {
@@ -166,7 +166,7 @@ func TestSearxngSearchWithMaxResults(t *testing.T) {
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
-	tool := NewSearxngSearch(WithBaseURL(mockSearchURL), WithMaxResults(2))
+	tool := New(WithBaseURL(mockSearchURL), WithMaxResults(2))
 	input := NewInput(EmptyCategory, []string{mockQuery})
 	result, err := tool.Run(ctx, input)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestSearxngSearchWithNoResults(t *testing.T) {
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
-	tool := NewSearxngSearch(WithBaseURL(mockSearchURL), WithMaxResults(2))
+	tool := New(WithBaseURL(mockSearchURL), WithMaxResults(2))
 	input := NewInput(EmptyCategory, []string{mockQuery})
 	result, err := tool.Run(ctx, input)
 	if err != nil {

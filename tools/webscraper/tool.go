@@ -2,7 +2,6 @@ package webscraper
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -32,11 +31,6 @@ func NewInput(link string, includeLinks bool) *Input {
 	}
 }
 
-func (s Input) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
 // Metadata Schema for webpage metadata
 type Metadata struct {
 	// Title is the title of the webpage.
@@ -51,11 +45,6 @@ type Metadata struct {
 	SiteName string `json:"sitename,omitempty" jsonschema:"title=sitename,description=The name of the website."`
 	// Domain is the domain name of the website.
 	Domain string `json:"domain,omitempty" jsonschema:"title=domain,description=The domain name of the website."`
-}
-
-func (s Metadata) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
 }
 
 // Output Schema for the output of the WebpageScraperTool.
@@ -73,11 +62,6 @@ func NewOutput(content string, metadata *Metadata) *Output {
 	}
 }
 
-func (s Output) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
 type Config struct {
 	tools.Config
 	// userAgent User agent string to use for requests.
@@ -93,7 +77,7 @@ type Webscraper struct {
 	Config
 }
 
-func NewWebscraper(opts ...Option) *Webscraper {
+func New(opts ...Option) *Webscraper {
 	ret := new(Webscraper)
 	for _, opt := range opts {
 		opt(&ret.Config)
