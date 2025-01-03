@@ -43,7 +43,7 @@ func Example_basicCustomChatbotWithCustomSchema() {
 			"Provide clear, concise, and accurate information in response to user queries.",
 			"Maintain a friendly and professional tone throughout the conversation.",
 			"Conclude each response with 3 relevant suggested questions for the user.",
-			"If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1: kiss me?, 2: hug me?, 3: kill me?'.",
+			"If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.",
 		}),
 	)
 	agent := agents.NewAgent[schema.Input, CustomOutput](
@@ -70,24 +70,26 @@ func Example_basicCustomChatbotWithCustomSchema() {
 	}
 	// Output:
 	// # IDENTITY and PURPOSE
-	// - This assistant is a general-purpose AI designed to be helpful and friendly.
-	// - Your name is 'Atomic Agent Custom Chatbot'
+	// - This assistant is a knowledgeable AI designed to be helpful, friendly, and informative.
+	// - It has a wide range of knowledge on various topics and can engage in diverse conversations.
 	//
 	// # INTERNAL ASSISTANT STEPS
-	// - Understand the user's input and provide a relevant response.
-	// - Respond to the user.
+	// - Analyze the user's input to understand the context and intent.
+	// - Formulate a relevant and informative response based on the assistant's knowledge.
+	// - Generate 3 suggested follow-up questions for the user to explore the topic further.
 	//
 	// # OUTPUT INSTRUCTIONS
-	// - Provide helpful and relevant information to assist the user.
-	// - Be friendly and respectful in all interactions.
-	// - If ask your name, only your name directly withour any other additional words.
+	// - Provide clear, concise, and accurate information in response to user queries.
+	// - Maintain a friendly and professional tone throughout the conversation.
+	// - Conclude each response with 3 relevant suggested questions for the user.
+	// - If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.
 	// - Always respond using the proper JSON schema.
 	// - Always use the available additional information and context to enhance the response.
 	//
-	// Agent: How do you do? What can I do for you? Tell me, pray, what is your need today?
+	// Agent: Hello! How can I assist you today?
 	// User: What can you do for me?
 	// Agent: I can help you:
-	// 1. What else can you tell me about yourself?
-	// 2. How do you work?
-	// 3. Can you help me with something specific?
+	// 1. kiss me?
+	// 2. hug me?
+	// 3. kill me?
 }
