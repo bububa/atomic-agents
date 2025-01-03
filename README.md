@@ -10,7 +10,7 @@
 
 Building AI agents, atomically. This is an implementation for [Atomic Agents](https://github.com/BrainBlend-AI/atomic-agents) in Golang.
 
-> The Atomic Agents framework is designed around the concept of atomicity to be an extremely lightweight and modular framework for building Agentic AI pipelines and applications without sacrificing developer experience and maintainability. The framework provides a set of tools and agents that can be combined to create powerful applications. It is built on top of [instructor](https://go.useinstructor.com) and leverages the power of [jsonschema](github.com/invopop/jsonschema) for data and schema validation and serialization. All logic and control flows are written in Golang, enabling developers to apply familiar best practices and workflows from traditional software development without compromising flexibility or clarity.
+> The Atomic Agents framework is designed around the concept of atomicity to be an extremely lightweight and modular framework for building Agentic AI pipelines and applications without sacrificing developer experience and maintainability. The framework provides a set of tools and agents that can be combined to create powerful applications. It is built on top of [instructor](https://go.useinstructor.com) and leverages the power of [jsonschema](https://github.com/invopop/jsonschema) for data and schema validation and serialization. All logic and control flows are written in Golang, enabling developers to apply familiar best practices and workflows from traditional software development without compromising flexibility or clarity.
 
 ## Anatomy of an Agent
 
