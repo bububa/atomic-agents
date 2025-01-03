@@ -6,7 +6,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.2.2
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/PuerkitoBio/goquery v1.10.1
-	github.com/bububa/instructor-go v1.0.1
+	github.com/bububa/instructor-go v1.0.2
 	github.com/cohere-ai/cohere-go/v2 v2.12.2
 	github.com/gabriel-vasile/mimetype v1.4.7
 	github.com/liushuangls/go-anthropic/v2 v2.13.0
