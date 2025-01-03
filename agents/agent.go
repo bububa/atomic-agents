@@ -3,7 +3,8 @@ package agents
 import (
 	"context"
 
-	"github.com/instructor-ai/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go/pkg/instructor"
+	cohere "github.com/cohere-ai/cohere-go/v2"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	openai "github.com/sashabaranov/go-openai"
 
@@ -95,7 +96,7 @@ func (a *Agent[I, O]) SetMaxTokens(maxTokens int) {
 }
 
 // Response obtains a response from the language model synchronously
-func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
+func (a *Agent[I, O]) response(ctx context.Context, response *O, apiResponse *components.ApiResponse) error {
 	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
 	msg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
 	messages = append(messages, *msg)
@@ -112,10 +113,14 @@ func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
 			msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
 		}
-		return clt.CreateChatCompletion(ctx, chatReq, response)
+		if res, err := clt.CreateChatCompletion(ctx, chatReq, response); err != nil {
+			return err
+		} else if apiResponse != nil {
+			apiResponse.FromOpenAI(&res)
+		}
 	case *instructor.InstructorAnthropic:
 		chatReq := anthropic.MessagesRequest{
-			Model:       a.model,
+			Model:       anthropic.Model(a.model),
 			Temperature: &a.temperature,
 			MaxTokens:   a.maxTokens,
 		}
@@ -124,19 +129,44 @@ func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
 			msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
 		}
-		return clt.CreateMessages(ctx, chatReq, response)
+		if res, err := clt.CreateMessages(ctx, chatReq, response); err != nil {
+			return err
+		} else if apiResponse != nil {
+			apiResponse.FromAnthropic(&res)
+		}
+	case *instructor.InstructorCohere:
+		lastIdx := len(messages) - 2
+		temperature := float64(a.temperature)
+		chatReq := cohere.ChatRequest{
+			Model:       &a.model,
+			Temperature: &temperature,
+			MaxTokens:   &a.maxTokens,
+			Message:     schema.Stringify(messages[lastIdx].Content()),
+		}
+		for idx, msg := range messages {
+			if idx >= lastIdx {
+				break
+			}
+			v := new(cohere.Message)
+			msg.ToCohere(v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+		}
+		if res, err := clt.Chat(ctx, &chatReq, response); err != nil {
+			return err
+		} else if apiResponse != nil {
+			apiResponse.FromCohere(res)
+		}
 	}
-	return nil, nil
+	return nil
 }
 
 // Run runs the chat agent with the given user input synchronously.
-func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O) error {
+func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp *components.ApiResponse) error {
 	if userInput != nil {
 		a.memory.NewTurn()
 		a.memory.NewMessage(components.UserRole, *userInput)
 	}
-	_, err := a.response(ctx, output)
-	return err
+	return a.response(ctx, output, apiResp)
 }
 
 // SystemPromptContextProvider returns agent systemPromptGenerator's context provider

@@ -35,7 +35,8 @@ func (g *Generator) Generate() string {
 		}
 		promptParts []string
 	)
-	for title, content := range sections {
+	for _, title := range []string{"IDENTITY and PURPOSE", "INTERNAL ASSISTANT STEPS", "OUTPUT INSTRUCTIONS"} {
+		content := sections[title]
 		if len(content) > 0 {
 			promptParts = append(promptParts, fmt.Sprintf("# %s", title))
 			for _, item := range content {

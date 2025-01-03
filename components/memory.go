@@ -25,6 +25,7 @@ type Memory struct {
 func NewMemory(maxMessages int) *Memory {
 	return &Memory{
 		maxMessages: maxMessages,
+		history:     make([]Message, 0, maxMessages),
 		mtx:         new(sync.RWMutex),
 	}
 }
@@ -58,7 +59,7 @@ func (m *Memory) NewTurn() *Memory {
 
 // NewMessage adds a message to the chat history and manages overflow.
 func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
-	msg := NewMessage(role, content.Snapshot()).SetTurnID(m.turnID)
+	msg := NewMessage(role, content).SetTurnID(m.turnID)
 	m.mtx.Lock()
 	// Manages the chat history overflow based on max_messages constraint.
 	m.history = append(m.history, *msg)
@@ -89,6 +90,13 @@ func (m *Memory) History() []Message {
 // Copy creates a copy of the chat memory.
 func (m *Memory) Copy(dist *Memory) {
 	dist.SetMaxMessages(m.maxMessages).SetTurnID(m.turnID).SetHistory(m.History())
+}
+
+func (m *Memory) Reset() *Memory {
+	m.mtx.Lock()
+	m.history = make([]Message, 0, m.maxMessages)
+	m.mtx.Unlock()
+	return m
 }
 
 // DeleteTurn delete messages from the memory by its turn ID.
