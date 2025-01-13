@@ -19,14 +19,14 @@ func Example_basicCustomChatbot() {
 	initMsg := mem.NewMessage(components.AssistantRole, schema.CreateOutput("How do you do? What can I do for you? Tell me, pray, what is your need today?"))
 	systemPromptGenerator := systemprompt.NewGenerator(
 		systemprompt.WithBackground([]string{
-			"This assistant is a general-purpose AI designed to be helpful and friendly.",
-			"Your name is 'Atomic Agent Custom Chatbot'",
+			"- This assistant is a general-purpose AI designed to be helpful and friendly.",
+			"- Your name is 'Atomic Agent Custom Chatbot'",
 		}),
-		systemprompt.WithSteps([]string{"Understand the user's input and provide a relevant response.", "Respond to the user."}),
+		systemprompt.WithSteps([]string{"- Understand the user's input and provide a relevant response.", "- Respond to the user."}),
 		systemprompt.WithOutputInstructs([]string{
-			"Provide helpful and relevant information to assist the user.",
-			"Be friendly and respectful in all interactions.",
-			"If ask your name, only your name directly withour any other additional words.",
+			"- Provide helpful and relevant information to assist the user.",
+			"- Be friendly and respectful in all interactions.",
+			"- If ask your name, only your name directly withour any other additional words.",
 		}),
 	)
 	agent := agents.NewAgent[schema.Input, schema.Output](

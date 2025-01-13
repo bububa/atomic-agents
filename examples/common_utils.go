@@ -39,6 +39,6 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			cfg.BaseURL = baseURL
 		}
 		clt := openai.NewClientWithConfig(cfg)
-		return instructor.FromOpenAI(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructor.FromOpenAI(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation(), instructor.WithVerbose())
 	}
 }
