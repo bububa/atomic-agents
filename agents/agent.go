@@ -166,7 +166,11 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 		a.memory.NewTurn()
 		a.memory.NewMessage(components.UserRole, *userInput)
 	}
-	return a.response(ctx, output, apiResp)
+	if err := a.response(ctx, output, apiResp); err != nil {
+		return err
+	}
+	a.memory.NewMessage(components.AssistantRole, *output)
+	return nil
 }
 
 // SystemPromptContextProvider returns agent systemPromptGenerator's context provider
