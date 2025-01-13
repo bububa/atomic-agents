@@ -9,6 +9,9 @@ type Schema interface {
 }
 
 func Stringify(s Schema) string {
+	if v, ok := s.(String); ok {
+		return string(v)
+	}
 	bs, _ := json.Marshal(s)
 	return string(bs)
 }
