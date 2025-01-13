@@ -49,7 +49,7 @@ Atomic Agents with the following main components:
 1. `agents/`: The core Atomic Agents library
 2. `components/`: The Atomic Agents components contains `Message`, `Memory`, `SystemPromptGenerator`, `SystemPromptContextProvider` utilities
 3. `schema/`: Defines the Input/Output schema structures and interfaces
-4. `atomic-examples/`: Example projects showcasing Atomic Agents usage
+4. `examples/`: Example projects showcasing Atomic Agents usage
 5. `tools/`: A collection of tools that can be used with Atomic Agents
 
 ## Quickstart & Examples

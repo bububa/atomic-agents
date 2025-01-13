@@ -25,7 +25,7 @@ type Memory struct {
 func NewMemory(maxMessages int) *Memory {
 	return &Memory{
 		maxMessages: maxMessages,
-		history:     make([]Message, 0, maxMessages),
+		history:     make([]Message, 0, maxMessages+1),
 		mtx:         new(sync.RWMutex),
 	}
 }
@@ -64,7 +64,7 @@ func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
 	// Manages the chat history overflow based on max_messages constraint.
 	m.history = append(m.history, *msg)
 	l := len(m.history)
-	if m.maxMessages > 0 && l > m.maxMessages {
+	if m.maxMessages >= 0 && l > m.maxMessages {
 		m.history = m.history[1:]
 	}
 	m.mtx.Unlock()

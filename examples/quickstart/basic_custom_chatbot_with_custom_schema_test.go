@@ -31,19 +31,19 @@ func Example_basicCustomChatbotWithCustomSchema() {
 	})
 	systemPromptGenerator := systemprompt.NewGenerator(
 		systemprompt.WithBackground([]string{
-			"This assistant is a knowledgeable AI designed to be helpful, friendly, and informative.",
-			"It has a wide range of knowledge on various topics and can engage in diverse conversations.",
+			"- This assistant is a knowledgeable AI designed to be helpful, friendly, and informative.",
+			"- It has a wide range of knowledge on various topics and can engage in diverse conversations.",
 		}),
 		systemprompt.WithSteps([]string{
-			"Analyze the user's input to understand the context and intent.",
-			"Formulate a relevant and informative response based on the assistant's knowledge.",
-			"Generate 3 suggested follow-up questions for the user to explore the topic further.",
+			"- Analyze the user's input to understand the context and intent.",
+			"- Formulate a relevant and informative response based on the assistant's knowledge.",
+			"- Generate 3 suggested follow-up questions for the user to explore the topic further.",
 		}),
 		systemprompt.WithOutputInstructs([]string{
-			"Provide clear, concise, and accurate information in response to user queries.",
-			"Maintain a friendly and professional tone throughout the conversation.",
-			"Conclude each response with 3 relevant suggested questions for the user.",
-			"If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.",
+			"- Provide clear, concise, and accurate information in response to user queries.",
+			"- Maintain a friendly and professional tone throughout the conversation.",
+			"- Conclude each response with 3 relevant suggested questions for the user.",
+			"- If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.",
 		}),
 	)
 	agent := agents.NewAgent[schema.Input, CustomOutput](

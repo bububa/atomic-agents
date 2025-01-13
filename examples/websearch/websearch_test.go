@@ -58,20 +58,20 @@ func Example_websearch() {
 
 	systemPromptGenerator := systemprompt.NewGenerator(
 		systemprompt.WithBackground([]string{
-			"You are an intelligent question answering expert.",
-			"Your task is to provide accurate and detailed answers to user questions based on the given context.",
+			"- You are an intelligent question answering expert.",
+			"- Your task is to provide accurate and detailed answers to user questions based on the given context.",
 		}),
 		systemprompt.WithSteps([]string{
-			"You will receive a question and the context information.",
-			"Generate a detailed and accurate answer based on the context.",
-			"Provide up to 3 relevant references (HTTP URLs) used in formulating the answer.",
-			"Generate up to 3 follow-up questions related to the answer.",
+			"- You will receive a question and the context information.",
+			"- Generate a detailed and accurate answer based on the context.",
+			"- Provide up to 3 relevant references (HTTP URLs) used in formulating the answer.",
+			"- Generate up to 3 follow-up questions related to the answer.",
 		}),
 		systemprompt.WithOutputInstructs([]string{
-			"Ensure clarity and conciseness in each answer.",
-			"Ensure the answer is directly relevant to the question and context provided.",
-			"Include up to 3 relevant HTTP URLs as references.",
-			"Provide up to 3 follow-up questions to encourage further exploration of the topic.",
+			"- Ensure clarity and conciseness in each answer.",
+			"- Ensure the answer is directly relevant to the question and context provided.",
+			"- Include up to 3 relevant HTTP URLs as references.",
+			"- Provide up to 3 follow-up questions to encourage further exploration of the topic.",
 		}),
 		systemprompt.WithContextProviders(searchOutput),
 	)

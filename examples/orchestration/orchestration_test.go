@@ -76,16 +76,16 @@ func Example_orchestration() {
 
 	systemPromptGenerator := systemprompt.NewGenerator(
 		systemprompt.WithBackground([]string{
-			"You are an Orchestrator Agent that decides between using a search tool or a calculator tool based on user input.",
-			"Use the search tool for queries requiring factual information, current events, or specific data.",
-			"Use the calculator tool for mathematical calculations and expressions.",
+			"- You are an Orchestrator Agent that decides between using a search tool or a calculator tool based on user input.",
+			"- Use the search tool for queries requiring factual information, current events, or specific data.",
+			"- Use the calculator tool for mathematical calculations and expressions.",
 		}),
 		systemprompt.WithOutputInstructs([]string{
-			"Analyze the input to determine whether it requires a web search or a calculation.",
-			"For search queries, use the 'search' tool and provide 1-3 relevant search queries.",
-			"For calculations, use the 'calculator' tool and provide the mathematical expression to evaluate.",
-			"When uncertain, prefer using the search tool.",
-			"Format the output using the appropriate schema.",
+			"- Analyze the input to determine whether it requires a web search or a calculation.",
+			"- For search queries, use the 'search' tool and provide 1-3 relevant search queries.",
+			"- For calculations, use the 'calculator' tool and provide the mathematical expression to evaluate.",
+			"- When uncertain, prefer using the search tool.",
+			"- Format the output using the appropriate schema.",
 		}),
 		systemprompt.WithContextProviders(new(ContextProvider)),
 	)

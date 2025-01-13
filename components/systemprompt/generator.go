@@ -20,9 +20,9 @@ func NewGenerator(options ...Option) *Generator {
 		opt(ret)
 	}
 	if len(ret.background) == 0 {
-		ret.background = []string{"This is a conversation with a helpful and friendly AI assistant."}
+		ret.background = []string{"- This is a conversation with a helpful and friendly AI assistant."}
 	}
-	ret.outputInstructs = append(ret.outputInstructs, "Always respond using the proper JSON schema.", "Always use the available additional information and context to enhance the response.")
+	ret.outputInstructs = append(ret.outputInstructs, "- Always respond using the proper JSON schema.", "- Always use the available additional information and context to enhance the response.")
 	return ret
 }
 
@@ -39,9 +39,7 @@ func (g *Generator) Generate() string {
 		content := sections[title]
 		if len(content) > 0 {
 			promptParts = append(promptParts, fmt.Sprintf("# %s", title))
-			for _, item := range content {
-				promptParts = append(promptParts, fmt.Sprintf("- %s", item))
-			}
+			promptParts = append(promptParts, content...)
 			promptParts = append(promptParts, "")
 		}
 	}

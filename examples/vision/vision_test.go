@@ -103,8 +103,8 @@ func Example_vision() {
 
 	attachement := schema.Attachement{
 		ImageURLs: []string{
-			"https://github.com/BrainBlend-AI/atomic-agents/blob/main/atomic-examples/basic-multimodal/test_images/nutrition_label_1.jpg",
-			"https://github.com/BrainBlend-AI/atomic-agents/blob/main/atomic-examples/basic-multimodal/test_images/nutrition_label_2.jpg",
+			"https://raw.githubusercontent.com/BrainBlend-AI/atomic-agents/refs/heads/main/atomic-examples/basic-multimodal/test_images/nutrition_label_1.png",
+			"https://raw.githubusercontent.com/BrainBlend-AI/atomic-agents/refs/heads/main/atomic-examples/basic-multimodal/test_images/nutrition_label_2.jpg",
 		},
 	}
 	input := &Input{
@@ -140,4 +140,6 @@ func Example_vision() {
 		fmt.Printf("Iron: %dmg\n", label.Iron)
 		fmt.Printf("Potassium: %dmg\n", label.Potassium)
 	}
+	// Output:
+	//
 }
