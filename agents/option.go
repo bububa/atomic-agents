@@ -21,7 +21,7 @@ func WithMemory(m *components.Memory) Option {
 	}
 }
 
-func WithSystemPromptGenerator(g *systemprompt.Generator) Option {
+func WithSystemPromptGenerator(g systemprompt.Generator) Option {
 	return func(c *Config) {
 		c.systemPromptGenerator = g
 	}

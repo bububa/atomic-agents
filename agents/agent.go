@@ -10,6 +10,7 @@ import (
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
+	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/schema"
 )
 
@@ -29,7 +30,7 @@ type Config struct {
 	//	memory  Memory component for storing chat history.
 	memory *components.Memory
 	//	systemPromptGenerator Component for generating system prompts.
-	systemPromptGenerator *systemprompt.Generator
+	systemPromptGenerator systemprompt.Generator
 	// initialMemory (AgentMemory): Initial state of the memory
 	initialMemory *components.Memory
 	// currentUserInput
@@ -59,7 +60,7 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 		ret.memory = components.NewMemory(0)
 	}
 	if ret.systemPromptGenerator == nil {
-		ret.systemPromptGenerator = systemprompt.NewGenerator()
+		ret.systemPromptGenerator = cot.New()
 	}
 	ret.initialMemory = components.NewMemory(0)
 	ret.memory.Copy(ret.initialMemory)
@@ -79,7 +80,7 @@ func (a *Agent[I, O]) SetMemory(m *components.Memory) {
 	a.memory = m
 }
 
-func (a *Agent[I, O]) SetSystemPromptGenerator(g *systemprompt.Generator) {
+func (a *Agent[I, O]) SetSystemPromptGenerator(g systemprompt.Generator) {
 	a.systemPromptGenerator = g
 }
 
