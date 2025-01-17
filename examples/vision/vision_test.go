@@ -6,7 +6,7 @@ import (
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
-	"github.com/bububa/atomic-agents/components/systemprompt"
+	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/instructor-go/pkg/instructor"
@@ -71,21 +71,21 @@ func Example_vision() {
 	ctx := context.Background()
 	fmt.Println("Analyzing nutrition labels...")
 	mem := components.NewMemory(10)
-	systemPromptGenerator := systemprompt.NewGenerator(
-		systemprompt.WithBackground([]string{
+	systemPromptGenerator := cot.New(
+		cot.WithBackground([]string{
 			"You are a specialized nutrition label analyzer.",
 			"You excel at extracting precise nutritional information from food label images.",
 			"You understand various serving size formats and measurement units.",
 			"You can process multiple nutrition labels simultaneously.",
 		}),
-		systemprompt.WithSteps([]string{
+		cot.WithSteps([]string{
 			"For each nutrition label image:",
 			"1. Locate and identify the nutrition facts panel",
 			"2. Extract all serving information and nutritional values",
 			"3. Validate measurements and units for accuracy",
 			"4. Compile the nutrition facts into structured data",
 		}),
-		systemprompt.WithOutputInstructs([]string{
+		cot.WithOutputInstructs([]string{
 			"For each analyzed nutrition label:",
 			"1. Record complete serving size information",
 			"2. Extract all nutrient values with correct units",

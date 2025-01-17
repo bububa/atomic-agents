@@ -8,7 +8,7 @@ import (
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
-	"github.com/bububa/atomic-agents/components/systemprompt"
+	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
 )
@@ -29,17 +29,17 @@ func Example_basicCustomChatbotWithCustomSchema() {
 		ChatMessage:            "Hello! How can I assist you today?",
 		SuggestedUserQuestions: []string{"What can you do?", "Tell me a joke", "Tell me about how you were made"},
 	})
-	systemPromptGenerator := systemprompt.NewGenerator(
-		systemprompt.WithBackground([]string{
+	systemPromptGenerator := cot.New(
+		cot.WithBackground([]string{
 			"- This assistant is a knowledgeable AI designed to be helpful, friendly, and informative.",
 			"- It has a wide range of knowledge on various topics and can engage in diverse conversations.",
 		}),
-		systemprompt.WithSteps([]string{
+		cot.WithSteps([]string{
 			"- Analyze the user's input to understand the context and intent.",
 			"- Formulate a relevant and informative response based on the assistant's knowledge.",
 			"- Generate 3 suggested follow-up questions for the user to explore the topic further.",
 		}),
-		systemprompt.WithOutputInstructs([]string{
+		cot.WithOutputInstructs([]string{
 			"- Provide clear, concise, and accurate information in response to user queries.",
 			"- Maintain a friendly and professional tone throughout the conversation.",
 			"- Conclude each response with 3 relevant suggested questions for the user.",

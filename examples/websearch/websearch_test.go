@@ -7,7 +7,7 @@ import (
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
-	"github.com/bububa/atomic-agents/components/systemprompt"
+	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools/searxng"
@@ -56,24 +56,24 @@ func Example_websearch() {
 		return
 	}
 
-	systemPromptGenerator := systemprompt.NewGenerator(
-		systemprompt.WithBackground([]string{
+	systemPromptGenerator := cot.New(
+		cot.WithBackground([]string{
 			"- You are an intelligent question answering expert.",
 			"- Your task is to provide accurate and detailed answers to user questions based on the given context.",
 		}),
-		systemprompt.WithSteps([]string{
+		cot.WithSteps([]string{
 			"- You will receive a question and the context information.",
 			"- Generate a detailed and accurate answer based on the context.",
 			"- Provide up to 3 relevant references (HTTP URLs) used in formulating the answer.",
 			"- Generate up to 3 follow-up questions related to the answer.",
 		}),
-		systemprompt.WithOutputInstructs([]string{
+		cot.WithOutputInstructs([]string{
 			"- Ensure clarity and conciseness in each answer.",
 			"- Ensure the answer is directly relevant to the question and context provided.",
 			"- Include up to 3 relevant HTTP URLs as references.",
 			"- Provide up to 3 follow-up questions to encourage further exploration of the topic.",
 		}),
-		systemprompt.WithContextProviders(searchOutput),
+		cot.WithContextProviders(searchOutput),
 	)
 	agent := agents.NewAgent[Input, Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
