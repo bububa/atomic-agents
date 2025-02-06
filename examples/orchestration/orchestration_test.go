@@ -132,46 +132,6 @@ func Example_orchestration() {
 		finalAgent.ResetMemory()
 	}
 	// Outputs:
-	// # IDENTITY and PURPOSE
-	// - You are an Orchestrator Agent that decides between using a search tool or a calculator tool based on user input.
-	// - Use the search tool for queries requiring factual information, current events, or specific data.
-	// - Use the calculator tool for mathematical calculations and expressions.
-	//
-	// # OUTPUT INSTRUCTIONS
-	// - Analyze the input to determine whether it requires a web search or a calculation.
-	// - For search queries, use the 'search' tool and provide 1-3 relevant search queries.
-	// - For calculations, use the 'calculator' tool and provide the mathematical expression to evaluate.
-	// - When uncertain, prefer using the search tool.
-	// - Format the output using the appropriate schema.
-	// - Always respond using the proper JSON schema.
-	// - Always use the available additional information and context to enhance the response.
-	//
-	// # EXTRA INFORMATION AND CONTEXT
-	// ## Current Date
-	// Current date in format YYYY-MM-DD:2025-01-03
-	//
-	// User: Who won the Nobel Prize in Physics in 2024?
-	// Agent: search
-	// SearchTool Result:
-	// TITLE: Result with Metadata
-	// URL: https://example.com/metadata
-	// CONTENT: Content with metadata
-	// METADATA: 2021-01-01
-	//
-	// TITLE: Result with Published Date
-	// URL: https://example.com/published-data
-	// CONTENT: Content with published date
-	// PUBLISHED DATE: 2022-01-01
-	//
-	// TITLE: Result without dates
-	// URL: https://example.com/no-dates
-	// CONTENT: Content without dates
-	//
-	//
 	// Agent: Final Answer is I will search for the winner of the Nobel Prize in Physics in 2024.
-	// User: Please calculate the sine of pi/3 to the third power
-	// Agent: calculator
-	// tool parameters: &{Base:{attachement:<nil>} Expression:sin(pi/3)^3 Params:map[]}
-	// CalculatorTool Result: 3
 	// Agent: The sine of pi/3 is 0.86602540378. Therefore, (sin(pi/3))^3 = 0.86602540378^3 = 0.64951905284.
 }
