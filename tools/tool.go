@@ -6,19 +6,22 @@ import (
 	"github.com/bububa/atomic-agents/schema"
 )
 
-type BaseTool interface {
+type ITool interface {
 	SetTitle(string)
 	Title() string
 	SetDescription(string)
 	Description() string
+	SetStartHook(fn func(context.Context, AnonymousTool, any))
+	SetEndHook(fn func(context.Context, AnonymousTool, any, any))
+	SetErrorHook(fn func(context.Context, AnonymousTool, any, error))
 }
 
 type Tool[I schema.Schema, O schema.Schema] interface {
-	BaseTool
+	ITool
 	Run(context.Context, *I, *O) error
 }
 
-type OrchestrationTool interface {
-	BaseTool
-	RunOrchestration(context.Context, any) (any, error)
+type AnonymousTool interface {
+	ITool
+	RunAnonymous(context.Context, any) (any, error)
 }

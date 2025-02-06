@@ -15,7 +15,12 @@ import (
 	"github.com/bububa/atomic-agents/schema"
 )
 
+type IAgent interface {
+	Name() string
+}
+
 type ChainableAgent interface {
+	IAgent
 	RunForChain(context.Context, any, *components.ApiResponse) (any, error)
 }
 
@@ -46,13 +51,18 @@ type Config struct {
 	temperature float32
 	// maxTokens Maximum number of tokens allowed in the response
 	maxTokens int
+	// name is Agent name presentation
+	name string
 }
 
 // Agent class for chat agents.
 // This class provides the core functionality for handling chat interactions, including managing memory,
 // generating system prompts, and obtaining responses from a language model.
-type Agent[T schema.Schema, O schema.Schema] struct {
+type Agent[I schema.Schema, O schema.Schema] struct {
 	Config
+	startHook func(context.Context, *Agent[I, O], *I)
+	endHook   func(context.Context, *Agent[I, O], *I, *O, *components.ApiResponse)
+	errorHook func(context.Context, *Agent[I, O], *I, *components.ApiResponse, error)
 }
 
 // NewAgent initializes the AgentAgent
@@ -99,6 +109,26 @@ func (a *Agent[I, O]) SetTemperature(temperature float32) {
 
 func (a *Agent[I, O]) SetMaxTokens(maxTokens int) {
 	a.maxTokens = maxTokens
+}
+
+func (a Agent[I, O]) Name() string {
+	return a.name
+}
+
+func (a *Agent[I, O]) SetName(name string) {
+	a.name = name
+}
+
+func (a *Agent[I, O]) SetStartHook(fn func(context.Context, *Agent[I, O], *I)) {
+	a.startHook = fn
+}
+
+func (a *Agent[I, O]) SetEndHook(fn func(context.Context, *Agent[I, O], *I, *O, *components.ApiResponse)) {
+	a.endHook = fn
+}
+
+func (a *Agent[I, O]) SetErrorHook(fn func(context.Context, *Agent[I, O], *I, *components.ApiResponse, error)) {
+	a.errorHook = fn
 }
 
 // Response obtains a response from the language model synchronously
@@ -168,14 +198,23 @@ func (a *Agent[I, O]) response(ctx context.Context, response *O, apiResponse *co
 
 // Run runs the chat agent with the given user input synchronously.
 func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp *components.ApiResponse) error {
+	if fn := a.startHook; fn != nil {
+		fn(ctx, a, userInput)
+	}
 	if userInput != nil {
 		a.memory.NewTurn()
 		a.memory.NewMessage(components.UserRole, *userInput)
 	}
 	if err := a.response(ctx, output, apiResp); err != nil {
+		if fn := a.errorHook; fn != nil {
+			fn(ctx, a, userInput, apiResp, err)
+		}
 		return err
 	}
 	a.memory.NewMessage(components.AssistantRole, *output)
+	if fn := a.endHook; fn != nil {
+		fn(ctx, a, userInput, output, apiResp)
+	}
 	return nil
 }
 

@@ -201,15 +201,28 @@ func (t *Webscraper) cleanMarkdownContent(content string) string {
 	return content
 }
 
-// RunOchestration run tool for tools ochestration
-func (t *Webscraper) RunOrchestration(ctx context.Context, input any) (any, error) {
+// RunAnonymous run tool for tools ochestration
+func (t *Webscraper) RunAnonymous(ctx context.Context, input any) (any, error) {
+	if fn := t.StartHook(); fn != nil {
+		fn(ctx, t, input)
+	}
 	in, ok := input.(*Input)
 	if !ok {
-		return nil, errors.New("invalid tool input")
+		err := errors.New("invalid tool input schema")
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
+		return nil, err
 	}
 	out := new(Output)
 	if err := t.Run(ctx, in, out); err != nil {
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
 		return nil, err
+	}
+	if fn := t.EndHook(); fn != nil {
+		fn(ctx, t, input, out)
 	}
 	return out, nil
 }

@@ -109,7 +109,7 @@ func Example_orchestration() {
 		agents.WithTemperature(0.5),
 		agents.WithMaxTokens(1000),
 	)
-	toolSelector := func(req *Output) (tools.OrchestrationTool, any, error) {
+	toolSelector := func(req *Output) (tools.AnonymousTool, any, error) {
 		switch req.Tool {
 		case SearchTool:
 			return searchTool, req.SearchParameters, nil

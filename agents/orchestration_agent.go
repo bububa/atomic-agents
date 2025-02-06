@@ -13,6 +13,7 @@ type AgentSelector[I schema.Schema] func(req *I) (ChainableAgent, any, error)
 
 // OrchestrationAgent is an agent for orchestration
 type OrchestrationAgent[I schema.Schema, O schema.Schema] struct {
+	name     string
 	selector AgentSelector[I]
 }
 
@@ -20,6 +21,14 @@ func NewOrchestrationAgent[I schema.Schema, O schema.Schema](selector AgentSelec
 	return &OrchestrationAgent[I, O]{
 		selector: selector,
 	}
+}
+
+func (a *OrchestrationAgent[I, O]) Name() string {
+	return a.name
+}
+
+func (a *OrchestrationAgent[I, O]) SetName(name string) {
+	a.name = name
 }
 
 func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O, apiResp *components.ApiResponse) error {

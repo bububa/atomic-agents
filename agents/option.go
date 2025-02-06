@@ -44,3 +44,9 @@ func WithMaxTokens(maxTokens int) Option {
 		c.maxTokens = maxTokens
 	}
 }
+
+func WithName(name string) Option {
+	return func(c *Config) {
+		c.name = name
+	}
+}
