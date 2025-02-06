@@ -2,6 +2,17 @@ package optimizer
 
 import "github.com/bububa/atomic-agents/schema"
 
+// OptimizationEntry represents a single step in the optimization process,
+// containing both the prompt and its assessment.
+type OptimizationEntry struct {
+	schema.Base
+	// Prompt is the LLM prompt being evaluated
+	Prompt schema.Schema `json:"prompt" jsonschema:"title=prompt,description=previous evaluated prompt"`
+
+	// Assessment contains the comprehensive evaluation of the prompt
+	Assessment PromptAssessment `json:"assessment" jsonschema:"title=assessment,description=the comprehensive evaluation of the prompt"`
+}
+
 // Metric represents a quantitative or qualitative measure of prompt performance.
 // Each metric provides a specific aspect of evaluation with supporting reasoning.
 type Metric struct {

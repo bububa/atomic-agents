@@ -48,8 +48,8 @@ func TestSearxngSearchWithCategory(t *testing.T) {
 	// Initialize the tool
 	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(NewsCategory, []string{mockQuery})
-	result, err := tool.Run(ctx, input)
-	if err != nil {
+	result := new(Output)
+	if err := tool.Run(ctx, input, result); err != nil {
 		t.Fatalf("Error running SearxngSearch: %v", err)
 		return
 	}
@@ -92,8 +92,8 @@ func TestSearxngSearchMissingFields(t *testing.T) {
 	// Initialize the tool
 	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(EmptyCategory, []string{mockQuery})
-	result, err := tool.Run(ctx, input)
-	if err != nil {
+	result := new(Output)
+	if err := tool.Run(ctx, input, result); err != nil {
 		t.Fatalf("Error running SearxngSearch: %v", err)
 		return
 	}
@@ -127,8 +127,8 @@ func TestSearxngSearchWithMetadataAndPublishedDate(t *testing.T) {
 	// Initialize the tool
 	tool := New(WithBaseURL(mockSearchURL))
 	input := NewInput(EmptyCategory, []string{mockQuery})
-	result, err := tool.Run(ctx, input)
-	if err != nil {
+	result := new(Output)
+	if err := tool.Run(ctx, input, result); err != nil {
 		t.Fatalf("Error running SearxngSearch: %v", err)
 		return
 	}
@@ -168,8 +168,8 @@ func TestSearxngSearchWithMaxResults(t *testing.T) {
 	// Initialize the tool
 	tool := New(WithBaseURL(mockSearchURL), WithMaxResults(2))
 	input := NewInput(EmptyCategory, []string{mockQuery})
-	result, err := tool.Run(ctx, input)
-	if err != nil {
+	result := new(Output)
+	if err := tool.Run(ctx, input, result); err != nil {
 		t.Fatalf("Error running SearxngSearch: %v", err)
 		return
 	}
@@ -192,8 +192,8 @@ func TestSearxngSearchWithNoResults(t *testing.T) {
 	// Initialize the tool
 	tool := New(WithBaseURL(mockSearchURL), WithMaxResults(2))
 	input := NewInput(EmptyCategory, []string{mockQuery})
-	result, err := tool.Run(ctx, input)
-	if err != nil {
+	result := new(Output)
+	if err := tool.Run(ctx, input, result); err != nil {
 		t.Fatalf("Error running SearxngSearch: %v", err)
 		return
 	}

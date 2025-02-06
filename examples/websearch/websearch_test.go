@@ -50,8 +50,8 @@ func Example_websearch() {
 	mem := components.NewMemory(10)
 	searchInput := searxng.NewInput(searxng.GeneralCategory, []string{mockQuery})
 	searchTool := searxng.New(searxng.WithBaseURL(mockSearchURL), searxng.WithMaxResults(3))
-	searchOutput, err := searchTool.Run(ctx, searchInput)
-	if err != nil {
+	searchOutput := new(searxng.Output)
+	if err := searchTool.Run(ctx, searchInput, searchOutput); err != nil {
 		fmt.Println(err)
 		return
 	}

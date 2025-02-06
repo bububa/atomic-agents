@@ -39,7 +39,7 @@ type ApiResponse struct {
 	ID        string      `json:"id,omitempty"`
 	Role      MessageRole `json:"role,omitempty"`
 	Model     string      `json:"model,omitempty"`
-	Useage    *ApiUseage  `json:"usage,omitempty"`
+	Usage     *ApiUsage   `json:"usage,omitempty"`
 	Timestamp int64       `json:"ts,omitempty"`
 	Details   any         `json:"content,omitempty"`
 }
@@ -49,7 +49,7 @@ func (r *ApiResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
 	r.ID = v.ID
 	r.Role = AssistantRole
 	r.Model = v.Model
-	r.Useage = &ApiUseage{
+	r.Usage = &ApiUsage{
 		InputTokens:  v.Usage.PromptTokens,
 		OutputTokens: v.Usage.CompletionTokens,
 	}
@@ -61,7 +61,7 @@ func (r *ApiResponse) FromAnthropic(v *anthropic.MessagesResponse) {
 	r.ID = v.ID
 	r.Role = AssistantRole
 	r.Model = string(v.Model)
-	r.Useage = &ApiUseage{
+	r.Usage = &ApiUsage{
 		InputTokens:  v.Usage.InputTokens,
 		OutputTokens: v.Usage.OutputTokens,
 	}
@@ -75,13 +75,13 @@ func (r *ApiResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 	}
 	r.Role = AssistantRole
 	if meta := v.Meta; meta != nil {
-		if useage := meta.Tokens; useage != nil {
-			r.Useage = new(ApiUseage)
-			if useage.InputTokens != nil {
-				r.Useage.InputTokens = int(*useage.InputTokens)
+		if usage := meta.Tokens; usage != nil {
+			r.Usage = new(ApiUsage)
+			if usage.InputTokens != nil {
+				r.Usage.InputTokens = int(*usage.InputTokens)
 			}
-			if useage.OutputTokens != nil {
-				r.Useage.OutputTokens = int(*useage.OutputTokens)
+			if usage.OutputTokens != nil {
+				r.Usage.OutputTokens = int(*usage.OutputTokens)
 			}
 		}
 		if version := meta.ApiVersion; version != nil {
@@ -91,7 +91,7 @@ func (r *ApiResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 	r.Details = v
 }
 
-type ApiUseage struct {
+type ApiUsage struct {
 	InputTokens  int `json:"input_tokens,omitempty"`
 	OutputTokens int `json:"output_tokens,omitempty"`
 }

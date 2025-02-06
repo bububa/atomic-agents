@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
+	"github.com/bububa/atomic-agents/tools"
 	"github.com/bububa/atomic-agents/tools/calculator"
+	"github.com/bububa/atomic-agents/tools/orchestration"
 	"github.com/bububa/atomic-agents/tools/searxng"
 	"github.com/bububa/instructor-go/pkg/instructor"
 )
@@ -89,18 +92,8 @@ func Example_orchestration() {
 		}),
 		cot.WithContextProviders(new(ContextProvider)),
 	)
-	agent := agents.NewAgent[Input, Output](
-		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
-		agents.WithSystemPromptGenerator(systemPromptGenerator),
-		agents.WithTemperature(0.5),
-		agents.WithMaxTokens(1000))
 	searchTool := searxng.New(searxng.WithBaseURL(mockSearchURL), searxng.WithMaxResults(3))
 	calculatorTool := calculator.New()
-
-	fmt.Println(agent.SystemPrompt())
-	fmt.Println("")
 
 	// example inputs
 	inputs := []string{
@@ -108,54 +101,35 @@ func Example_orchestration() {
 		"Please calculate the sine of pi/3 to the third power",
 	}
 	finalOutput := new(FinalAnswer)
-	finalAgent := agents.NewAgent[Input, FinalAnswer](
+	finalAgent := agents.NewToolAgent[Input, Output, FinalAnswer](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
 		agents.WithModel("gpt-4o-mini"),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),
-		agents.WithMaxTokens(1000))
+		agents.WithMaxTokens(1000),
+	)
+	toolSelector := func(req *Output) (tools.OrchestrationTool, any, error) {
+		switch req.Tool {
+		case SearchTool:
+			return searchTool, req.SearchParameters, nil
+		case CalculatorTool:
+			return calculatorTool, req.CalculatorParameters, nil
+		default:
+			return nil, nil, errors.New("unknown tool")
+		}
+	}
+	finalAgent.SetTool(orchestration.New(toolSelector))
 	for _, userInput := range inputs {
 		input := Input{
 			ChatMessage: userInput,
-		}
-		output := new(Output)
-		if err := agent.Run(ctx, &input, output, nil); err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Printf("User: %s\n", input.ChatMessage)
-		fmt.Printf("Agent: %s\n", output.Tool)
-		switch output.Tool {
-		case SearchTool:
-			if resp, err := searchTool.Run(ctx, output.SearchParameters); err != nil {
-				fmt.Println(err)
-				return
-			} else {
-				fmt.Println("SearchTool Result:")
-				fmt.Println(resp.Info())
-				mem.NewMessage(components.SystemRole, *resp)
-				if err := finalAgent.Run(ctx, &input, finalOutput, nil); err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-		case CalculatorTool:
-			fmt.Printf("tool parameters: %+v\n", output.CalculatorParameters)
-			if resp, err := calculatorTool.Run(ctx, output.CalculatorParameters); err != nil {
-				fmt.Println(err)
-				return
-			} else {
-				fmt.Printf("CalculatorTool Result: %+v\n", resp.Result)
-				mem.NewMessage(components.SystemRole, *resp)
-			}
 		}
 		if err := finalAgent.Run(ctx, &input, finalOutput, nil); err != nil {
 			fmt.Println(err)
 			return
 		}
 		fmt.Printf("Agent: %s\n", finalOutput.FinalAnswer)
-		mem.Reset()
+		finalAgent.ResetMemory()
 	}
 	// Outputs:
 	// # IDENTITY and PURPOSE

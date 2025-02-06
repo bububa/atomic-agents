@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Knetic/govaluate"
 
@@ -58,10 +59,10 @@ func New(opts ...tools.Option) *Tool {
 }
 
 // Executes the CalculatorTool with the given parameters.
-func (t *Tool) Run(ctx context.Context, input *Input) (*Output, error) {
+func (t *Tool) Run(ctx context.Context, input *Input, output *Output) error {
 	exp, err := govaluate.NewEvaluableExpressionWithFunctions(input.Expression, functions.Functions)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	params := make(map[string]interface{}, len(input.Params)+len(constParams))
 	for k, v := range input.Params {
@@ -75,7 +76,21 @@ func (t *Tool) Run(ctx context.Context, input *Input) (*Output, error) {
 	}
 	result, err := exp.Evaluate(params)
 	if err != nil {
+		return err
+	}
+	*output = *NewOutput(result)
+	return nil
+}
+
+// RunOchestration run tool for tools ochestration
+func (t *Tool) RunOrchestration(ctx context.Context, input any) (any, error) {
+	in, ok := input.(*Input)
+	if !ok {
+		return nil, errors.New("invalid tool input")
+	}
+	out := new(Output)
+	if err := t.Run(ctx, in, out); err != nil {
 		return nil, err
 	}
-	return NewOutput(result), nil
+	return out, nil
 }

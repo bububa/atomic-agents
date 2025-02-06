@@ -10,16 +10,6 @@ import (
 	"github.com/bububa/atomic-agents/schema"
 )
 
-// OptimizationEntry represents a single step in the optimization process,
-// containing both the prompt and its assessment.
-type OptimizationEntry struct {
-	// Prompt is the LLM prompt being evaluated
-	Prompt schema.Schema
-
-	// Assessment contains the comprehensive evaluation of the prompt
-	Assessment PromptAssessment
-}
-
 // OptimizerOption is a function type for configuring the PromptOptimizer.
 // It follows the functional options pattern for flexible configuration.
 type OptimizerOption func(*OptimizerConfig)
@@ -66,7 +56,7 @@ type OptimizerConfig struct {
 // improvement suggestions, and validation.
 type PromptOptimizer[T schema.Schema] struct {
 	assessmentAgent  *agents.Agent[T, PromptAssessment]
-	improvementAgent *agents.Agent[T, PromptImprovement[T]]
+	improvementAgent *agents.Agent[OptimizationEntry, PromptImprovement[T]]
 
 	// taskDesc describes the intended use of the prompt
 	taskDesc string
@@ -108,7 +98,7 @@ func NewPromptOptimizer[I schema.Schema](agentOpts []agents.Option, taskDesc str
 	assessOpts = append(assessOpts, agents.WithSystemPromptGenerator(optimizer.assessmentPromptGenerator()))
 	improveOpts = append(improveOpts, agents.WithSystemPromptGenerator(optimizer.improvementPromptGenerator()))
 	optimizer.assessmentAgent = agents.NewAgent[I, PromptAssessment](assessOpts...)
-	optimizer.improvementAgent = agents.NewAgent[I, PromptImprovement[I]](improveOpts...)
+	optimizer.improvementAgent = agents.NewAgent[OptimizationEntry, PromptImprovement[I]](improveOpts...)
 
 	return optimizer
 }
@@ -139,7 +129,7 @@ func (po *PromptOptimizer[I]) OptimizePrompt(ctx context.Context, prompt *I) (*I
 
 		// Retry loop for assessment
 		for attempt := 0; attempt < po.maxRetries; attempt++ {
-			if err := po.assessPrompt(ctx, currentPrompt, &entry.Assessment); err == nil {
+			if err = po.assessPrompt(ctx, currentPrompt, &entry.Assessment); err == nil {
 				break
 			}
 
@@ -177,14 +167,14 @@ func (po *PromptOptimizer[I]) OptimizePrompt(ctx context.Context, prompt *I) (*I
 		}
 
 		// Generate improved prompt
-		improvedPrompt, err := po.generateImprovedPrompt(ctx, entry)
+		improvedPrompt, err := po.improvementPrompt(ctx, &entry)
 		if err != nil {
 			log.Printf("Failed to generate improved prompt at iteration %d: %v\n", i+1, err)
 			continue
 		}
 
 		currentPrompt = improvedPrompt
-		log.Printf("Iteration %d complete. New prompt: %s\n", i+1, currentPrompt.Input)
+		log.Printf("Iteration %d complete. New prompt: %s\n", i+1, currentPrompt)
 	}
 
 	return bestPrompt, nil

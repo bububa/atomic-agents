@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"errors"
 
 	"github.com/bububa/instructor-go/pkg/instructor"
 	cohere "github.com/cohere-ai/cohere-go/v2"
@@ -13,6 +14,10 @@ import (
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/schema"
 )
+
+type ChainableAgent interface {
+	RunForChain(context.Context, any, *components.ApiResponse) (any, error)
+}
 
 type AgentSetter interface {
 	SetClient(clt instructor.Instructor)
@@ -69,7 +74,7 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 
 // ResetMemory resets the memory to its initial state
 func (a *Agent[I, O]) ResetMemory() {
-	a.initialMemory.Copy(a.memory)
+	a.memory.Reset()
 }
 
 func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
@@ -172,6 +177,23 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 	}
 	a.memory.NewMessage(components.AssistantRole, *output)
 	return nil
+}
+
+// Run runs the chat agent with the given user input for chain.
+func (a *Agent[I, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.ApiResponse) (any, error) {
+	in, ok := userInput.(*I)
+	if !ok {
+		return nil, errors.New("invalid input schema")
+	}
+	out := new(O)
+	if err := a.Run(ctx, in, out, apiResp); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (a *Agent[I, O]) NewMessage(role components.MessageRole, content schema.Schema) *components.Message {
+	return a.memory.NewMessage(role, content)
 }
 
 // SystemPromptContextProvider returns agent systemPromptGenerator's context provider
