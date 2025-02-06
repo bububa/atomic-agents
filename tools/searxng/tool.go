@@ -3,6 +3,7 @@ package searxng
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -138,7 +139,7 @@ func New(opts ...Option) *Tool {
 }
 
 // Run Runs the SearxNGTool synchronously with the given parameters
-func (t *Tool) Run(ctx context.Context, input *Input) (*Output, error) {
+func (t *Tool) Run(ctx context.Context, input *Input, output *Output) error {
 	list := make([]SearchResultItem, 0, len(input.Queries)*t.maxResults)
 	var (
 		wg   = new(sync.WaitGroup)
@@ -178,7 +179,8 @@ func (t *Tool) Run(ctx context.Context, input *Input) (*Output, error) {
 	if len(results) > maxResults {
 		results = results[:maxResults]
 	}
-	return NewOutput(strings.Join(input.Queries, ", "), results, input.Category), nil
+	*output = *NewOutput(strings.Join(input.Queries, ", "), results, input.Category)
+	return nil
 }
 
 // fetchSearchResults queries the local search engine and returns the parsed search response
@@ -220,4 +222,30 @@ func (t *Tool) fetchSearchResults(ctx context.Context, query string, category Ca
 	}
 
 	return searchResult.Results, nil
+}
+
+// RunAnonymous run tool for tools ochestration
+func (t *Tool) RunAnonymous(ctx context.Context, input any) (any, error) {
+	if fn := t.StartHook(); fn != nil {
+		fn(ctx, t, input)
+	}
+	in, ok := input.(*Input)
+	if !ok {
+		err := errors.New("invalid tool input schema")
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
+		return nil, err
+	}
+	out := new(Output)
+	if err := t.Run(ctx, in, out); err != nil {
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
+		return nil, err
+	}
+	if fn := t.EndHook(); fn != nil {
+		fn(ctx, t, input, out)
+	}
+	return out, nil
 }

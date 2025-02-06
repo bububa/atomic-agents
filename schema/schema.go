@@ -8,6 +8,11 @@ type Schema interface {
 	Attachement() *Attachement
 }
 
+type SchemaPointer interface {
+	Schema
+	SetAttachement(*Attachement)
+}
+
 func Stringify(s Schema) string {
 	if v, ok := s.(String); ok {
 		return string(v)

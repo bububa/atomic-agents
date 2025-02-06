@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
+	"github.com/bububa/atomic-agents/tools"
 	"github.com/bububa/atomic-agents/tools/calculator"
+	"github.com/bububa/atomic-agents/tools/orchestration"
 	"github.com/bububa/atomic-agents/tools/searxng"
 	"github.com/bububa/instructor-go/pkg/instructor"
 )
@@ -89,18 +92,8 @@ func Example_orchestration() {
 		}),
 		cot.WithContextProviders(new(ContextProvider)),
 	)
-	agent := agents.NewAgent[Input, Output](
-		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
-		agents.WithSystemPromptGenerator(systemPromptGenerator),
-		agents.WithTemperature(0.5),
-		agents.WithMaxTokens(1000))
 	searchTool := searxng.New(searxng.WithBaseURL(mockSearchURL), searxng.WithMaxResults(3))
 	calculatorTool := calculator.New()
-
-	fmt.Println(agent.SystemPrompt())
-	fmt.Println("")
 
 	// example inputs
 	inputs := []string{
@@ -108,96 +101,37 @@ func Example_orchestration() {
 		"Please calculate the sine of pi/3 to the third power",
 	}
 	finalOutput := new(FinalAnswer)
-	finalAgent := agents.NewAgent[Input, FinalAnswer](
+	finalAgent := agents.NewToolAgent[Input, Output, FinalAnswer](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
 		agents.WithModel("gpt-4o-mini"),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),
-		agents.WithMaxTokens(1000))
+		agents.WithMaxTokens(1000),
+	)
+	toolSelector := func(req *Output) (tools.AnonymousTool, any, error) {
+		switch req.Tool {
+		case SearchTool:
+			return searchTool, req.SearchParameters, nil
+		case CalculatorTool:
+			return calculatorTool, req.CalculatorParameters, nil
+		default:
+			return nil, nil, errors.New("unknown tool")
+		}
+	}
+	finalAgent.SetTool(orchestration.New(toolSelector))
 	for _, userInput := range inputs {
 		input := Input{
 			ChatMessage: userInput,
-		}
-		output := new(Output)
-		if err := agent.Run(ctx, &input, output, nil); err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Printf("User: %s\n", input.ChatMessage)
-		fmt.Printf("Agent: %s\n", output.Tool)
-		switch output.Tool {
-		case SearchTool:
-			if resp, err := searchTool.Run(ctx, output.SearchParameters); err != nil {
-				fmt.Println(err)
-				return
-			} else {
-				fmt.Println("SearchTool Result:")
-				fmt.Println(resp.Info())
-				mem.NewMessage(components.SystemRole, *resp)
-				if err := finalAgent.Run(ctx, &input, finalOutput, nil); err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-		case CalculatorTool:
-			fmt.Printf("tool parameters: %+v\n", output.CalculatorParameters)
-			if resp, err := calculatorTool.Run(ctx, output.CalculatorParameters); err != nil {
-				fmt.Println(err)
-				return
-			} else {
-				fmt.Printf("CalculatorTool Result: %+v\n", resp.Result)
-				mem.NewMessage(components.SystemRole, *resp)
-			}
 		}
 		if err := finalAgent.Run(ctx, &input, finalOutput, nil); err != nil {
 			fmt.Println(err)
 			return
 		}
 		fmt.Printf("Agent: %s\n", finalOutput.FinalAnswer)
-		mem.Reset()
+		finalAgent.ResetMemory()
 	}
 	// Outputs:
-	// # IDENTITY and PURPOSE
-	// - You are an Orchestrator Agent that decides between using a search tool or a calculator tool based on user input.
-	// - Use the search tool for queries requiring factual information, current events, or specific data.
-	// - Use the calculator tool for mathematical calculations and expressions.
-	//
-	// # OUTPUT INSTRUCTIONS
-	// - Analyze the input to determine whether it requires a web search or a calculation.
-	// - For search queries, use the 'search' tool and provide 1-3 relevant search queries.
-	// - For calculations, use the 'calculator' tool and provide the mathematical expression to evaluate.
-	// - When uncertain, prefer using the search tool.
-	// - Format the output using the appropriate schema.
-	// - Always respond using the proper JSON schema.
-	// - Always use the available additional information and context to enhance the response.
-	//
-	// # EXTRA INFORMATION AND CONTEXT
-	// ## Current Date
-	// Current date in format YYYY-MM-DD:2025-01-03
-	//
-	// User: Who won the Nobel Prize in Physics in 2024?
-	// Agent: search
-	// SearchTool Result:
-	// TITLE: Result with Metadata
-	// URL: https://example.com/metadata
-	// CONTENT: Content with metadata
-	// METADATA: 2021-01-01
-	//
-	// TITLE: Result with Published Date
-	// URL: https://example.com/published-data
-	// CONTENT: Content with published date
-	// PUBLISHED DATE: 2022-01-01
-	//
-	// TITLE: Result without dates
-	// URL: https://example.com/no-dates
-	// CONTENT: Content without dates
-	//
-	//
 	// Agent: Final Answer is I will search for the winner of the Nobel Prize in Physics in 2024.
-	// User: Please calculate the sine of pi/3 to the third power
-	// Agent: calculator
-	// tool parameters: &{Base:{attachement:<nil>} Expression:sin(pi/3)^3 Params:map[]}
-	// CalculatorTool Result: 3
 	// Agent: The sine of pi/3 is 0.86602540378. Therefore, (sin(pi/3))^3 = 0.86602540378^3 = 0.64951905284.
 }

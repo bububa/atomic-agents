@@ -2,6 +2,7 @@ package webscraper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -101,14 +102,14 @@ func New(opts ...Option) *Webscraper {
 	return ret
 }
 
-func (t *Webscraper) Run(ctx context.Context, input *Input) (*Output, error) {
+func (t *Webscraper) Run(ctx context.Context, input *Input, output *Output) error {
 	parsedURL, err := url.ParseRequestURI(input.URL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	doc, err := t.fetch(ctx, input)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Extract main content using custom extraction
 	mainContent := t.extractMainContent(doc)
@@ -117,15 +118,15 @@ func (t *Webscraper) Run(ctx context.Context, input *Input) (*Output, error) {
 		converter.WithDomain(fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)),
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	markdown = t.cleanMarkdownContent(markdown)
 	meta := new(Metadata)
 	meta.Domain = parsedURL.Host
 	// Extract metadata
 	t.extractMetata(doc, meta)
-	ret := NewOutput(markdown, meta)
-	return ret, nil
+	*output = *NewOutput(markdown, meta)
+	return nil
 }
 
 func (t *Webscraper) fetch(ctx context.Context, input *Input) (*goquery.Document, error) {
@@ -198,4 +199,30 @@ func (t *Webscraper) cleanMarkdownContent(content string) string {
 	// Ensure content ends with single newline
 	content = strings.TrimSpace(content) + "\n"
 	return content
+}
+
+// RunAnonymous run tool for tools ochestration
+func (t *Webscraper) RunAnonymous(ctx context.Context, input any) (any, error) {
+	if fn := t.StartHook(); fn != nil {
+		fn(ctx, t, input)
+	}
+	in, ok := input.(*Input)
+	if !ok {
+		err := errors.New("invalid tool input schema")
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
+		return nil, err
+	}
+	out := new(Output)
+	if err := t.Run(ctx, in, out); err != nil {
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
+		return nil, err
+	}
+	if fn := t.EndHook(); fn != nil {
+		fn(ctx, t, input, out)
+	}
+	return out, nil
 }
