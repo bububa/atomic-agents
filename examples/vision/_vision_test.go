@@ -3,6 +3,7 @@ package vision
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
@@ -96,7 +97,7 @@ func Example_vision() {
 	agent := agents.NewAgent[Input, Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
+		agents.WithModel(os.Getenv("OPENAI_VISION_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),
 		agents.WithMaxTokens(1000))

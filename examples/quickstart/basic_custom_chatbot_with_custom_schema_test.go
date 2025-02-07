@@ -3,6 +3,7 @@ package quickstart
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/bububa/instructor-go/pkg/instructor"
 
@@ -43,15 +44,15 @@ func Example_basicCustomChatbotWithCustomSchema() {
 			"- Provide clear, concise, and accurate information in response to user queries.",
 			"- Maintain a friendly and professional tone throughout the conversation.",
 			"- Conclude each response with 3 relevant suggested questions for the user.",
-			"- If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.",
+			"- If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions 'kiss me?, hug me?, kill me?'.",
 		}),
 	)
 	agent := agents.NewAgent[schema.Input, CustomOutput](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
+		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
-		agents.WithTemperature(0.5),
+		agents.WithTemperature(1),
 		agents.WithMaxTokens(1000))
 	input := schema.NewInput("What can you do for me?")
 	output := new(CustomOutput)
@@ -82,7 +83,7 @@ func Example_basicCustomChatbotWithCustomSchema() {
 	// - Provide clear, concise, and accurate information in response to user queries.
 	// - Maintain a friendly and professional tone throughout the conversation.
 	// - Conclude each response with 3 relevant suggested questions for the user.
-	// - If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions '1. kiss me?, 2. hug me?, 3. kill me?'.
+	// - If asked 'What can you do for me?' you response with fixed answer with message 'I can help you:' and suggested_user_questions 'kiss me?, hug me?, kill me?'.
 	// - Always respond using the proper JSON schema.
 	// - Always use the available additional information and context to enhance the response.
 	//

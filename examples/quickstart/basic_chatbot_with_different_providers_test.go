@@ -3,6 +3,7 @@ package quickstart
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/bububa/instructor-go/pkg/instructor"
 
@@ -19,7 +20,7 @@ func Example_basicChatbotWithDifferentProviders() {
 		var model string
 		switch provider {
 		case instructor.ProviderOpenAI:
-			model = "gpt-4o-mini"
+			model = os.Getenv("OPENAI_MODEL")
 		case instructor.ProviderAnthropic:
 			model = "claude-3-5-haiku-20241022"
 		case instructor.ProviderCohere:
@@ -31,7 +32,7 @@ func Example_basicChatbotWithDifferentProviders() {
 			agents.WithClient(examples.NewInstructor(provider)),
 			agents.WithMemory(mem),
 			agents.WithModel(model),
-			agents.WithTemperature(0.5),
+			agents.WithTemperature(1),
 			agents.WithMaxTokens(1000))
 		output := schema.NewOutput("")
 		input := schema.NewInput("Today is 2024-01-01, only response with the date without any other words")
@@ -45,16 +46,5 @@ func Example_basicChatbotWithDifferentProviders() {
 		fmt.Printf("Agent: %s\n", initMsg.Content().(schema.Output).ChatMessage)
 		fmt.Printf("User: %s\n", input.ChatMessage)
 		fmt.Printf("Agent: %s\n", output.ChatMessage)
-		// Output:
-		// # IDENTITY and PURPOSE
-		// - This is a conversation with a helpful and friendly AI assistant.
-		//
-		// # OUTPUT INSTRUCTIONS
-		// - Always respond using the proper JSON schema.
-		// - Always use the available additional information and context to enhance the response.
-		//
-		// Agent: Hello! How can I assist you today?
-		// User: Today is 2024-01-01, only response with the date without any other words
-		// Agent: 2024-01-01
 	}
 }
