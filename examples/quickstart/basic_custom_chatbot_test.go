@@ -3,6 +3,7 @@ package quickstart
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/bububa/instructor-go/pkg/instructor"
 
@@ -32,9 +33,9 @@ func Example_basicCustomChatbot() {
 	agent := agents.NewAgent[schema.Input, schema.Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
+		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
-		agents.WithTemperature(0.5),
+		agents.WithTemperature(1),
 		agents.WithMaxTokens(1000))
 	input := schema.NewInput("What is your name?")
 	output := schema.NewOutput("")

@@ -3,6 +3,7 @@ package quickstart
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/bububa/instructor-go/pkg/instructor"
 
@@ -19,8 +20,8 @@ func Example_basicChatbot() {
 	agent := agents.NewAgent[schema.Input, schema.Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
 		agents.WithMemory(mem),
-		agents.WithModel("gpt-4o-mini"),
-		agents.WithTemperature(0.5),
+		agents.WithModel(os.Getenv("OPENAI_MODEL")),
+		agents.WithTemperature(1),
 		agents.WithMaxTokens(1000))
 	output := schema.NewOutput("")
 	input := schema.NewInput("Today is 2024-01-01, only response with the date without any other words")
