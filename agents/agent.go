@@ -236,6 +236,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			llmResponse.FromGemini(res)
 		}
 	}
+	if llmResponse != nil && llmResponse.Model == "" {
+		llmResponse.Model = a.model
+	}
 	return nil
 }
 
@@ -259,6 +262,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		llmResp := new(openai.ChatCompletionResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromOpenAI(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := openai.ChatCompletionRequest{
 			Model:               a.model,
@@ -279,6 +285,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromAnthropic(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := anthropic.MessagesRequest{
 			Model:       anthropic.Model(a.model),
@@ -299,6 +308,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromCohere(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		lastIdx := len(messages) - 2
 		temperature := float64(a.temperature)
@@ -325,6 +337,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromGemini(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := gemini.Request{
 			Model: a.model,
@@ -377,6 +392,9 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		llmResp := new(openai.ChatCompletionResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromOpenAI(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := openai.ChatCompletionRequest{
 			Model:               a.model,
@@ -397,6 +415,9 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromAnthropic(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := anthropic.MessagesRequest{
 			Model:       anthropic.Model(a.model),
@@ -417,6 +438,9 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromCohere(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		lastIdx := len(messages) - 2
 		temperature := float64(a.temperature)
@@ -443,6 +467,9 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromGemini(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
 		}
 		chatReq := gemini.Request{
 			Model: a.model,
