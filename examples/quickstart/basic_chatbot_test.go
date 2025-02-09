@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
@@ -25,8 +25,8 @@ func Example_basicChatbot() {
 		agents.WithMaxTokens(1000))
 	output := schema.NewOutput("")
 	input := schema.NewInput("Today is 2024-01-01, only response with the date without any other words")
-	apiResp := new(components.ApiResponse)
-	if err := agent.Run(ctx, input, output, apiResp); err != nil {
+	llmResp := new(components.LLMResponse)
+	if err := agent.Run(ctx, input, output, llmResp); err != nil {
 		fmt.Println(err)
 		return
 	}

@@ -6,13 +6,14 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/bububa/instructor-go"
+
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools/searxng"
-	"github.com/bububa/instructor-go/pkg/instructor"
 )
 
 // Input defines the input schema for the QuestionAnsweringAgent.
@@ -88,8 +89,8 @@ func Example_websearch() {
 		Question: mockQuery,
 	}
 	output := new(Output)
-	apiResp := new(components.ApiResponse)
-	if err := agent.Run(ctx, input, output, apiResp); err != nil {
+	llmResp := new(components.LLMResponse)
+	if err := agent.Run(ctx, input, output, llmResp); err != nil {
 		fmt.Println(err)
 		return
 	}

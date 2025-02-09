@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 
 	"github.com/bububa/atomic-agents/agents"
 	"github.com/bububa/atomic-agents/components"
@@ -39,8 +39,8 @@ func Example_basicCustomChatbot() {
 		agents.WithMaxTokens(1000))
 	input := schema.NewInput("What is your name?")
 	output := schema.NewOutput("")
-	apiResp := new(components.ApiResponse)
-	if err := agent.Run(ctx, input, output, apiResp); err != nil {
+	llmResp := new(components.LLMResponse)
+	if err := agent.Run(ctx, input, output, llmResp); err != nil {
 		fmt.Println(err)
 		return
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 )
 
 // NutritionLabel Represents the complete nutritional information from a food label

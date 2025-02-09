@@ -3,14 +3,18 @@ package components
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
-	"image/png"
+	"image/jpeg"
 	"io"
 	"net/http"
+	"strings"
 
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	"github.com/gabriel-vasile/mimetype"
+	gemini "github.com/google/generative-ai-go/genai"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	"github.com/rs/xid"
 	openai "github.com/sashabaranov/go-openai"
@@ -34,22 +38,22 @@ const (
 	FunctionRole  MessageRole = "function"
 )
 
-// ApiResponse instructor provider chat response
-type ApiResponse struct {
+// LLMResponse instructor provider chat response
+type LLMResponse struct {
 	ID        string      `json:"id,omitempty"`
 	Role      MessageRole `json:"role,omitempty"`
 	Model     string      `json:"model,omitempty"`
-	Usage     *ApiUsage   `json:"usage,omitempty"`
+	Usage     *LLMUsage   `json:"usage,omitempty"`
 	Timestamp int64       `json:"ts,omitempty"`
 	Details   any         `json:"content,omitempty"`
 }
 
 // FromOpenAI convnert response from openai
-func (r *ApiResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
+func (r *LLMResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
 	r.ID = v.ID
 	r.Role = AssistantRole
 	r.Model = v.Model
-	r.Usage = &ApiUsage{
+	r.Usage = &LLMUsage{
 		InputTokens:  v.Usage.PromptTokens,
 		OutputTokens: v.Usage.CompletionTokens,
 	}
@@ -57,11 +61,11 @@ func (r *ApiResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
 }
 
 // FromAnthropic convert response from anthropic
-func (r *ApiResponse) FromAnthropic(v *anthropic.MessagesResponse) {
+func (r *LLMResponse) FromAnthropic(v *anthropic.MessagesResponse) {
 	r.ID = v.ID
 	r.Role = AssistantRole
 	r.Model = string(v.Model)
-	r.Usage = &ApiUsage{
+	r.Usage = &LLMUsage{
 		InputTokens:  v.Usage.InputTokens,
 		OutputTokens: v.Usage.OutputTokens,
 	}
@@ -69,14 +73,14 @@ func (r *ApiResponse) FromAnthropic(v *anthropic.MessagesResponse) {
 }
 
 // FromCohere convert response from cohere
-func (r *ApiResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
+func (r *LLMResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 	if v.GenerationId != nil {
 		r.ID = *v.GenerationId
 	}
 	r.Role = AssistantRole
 	if meta := v.Meta; meta != nil {
 		if usage := meta.Tokens; usage != nil {
-			r.Usage = new(ApiUsage)
+			r.Usage = new(LLMUsage)
 			if usage.InputTokens != nil {
 				r.Usage.InputTokens = int(*usage.InputTokens)
 			}
@@ -91,7 +95,18 @@ func (r *ApiResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 	r.Details = v
 }
 
-type ApiUsage struct {
+func (r *LLMResponse) FromGemini(v *gemini.GenerateContentResponse) {
+	r.Role = AssistantRole
+	if v.UsageMetadata != nil {
+		r.Usage = &LLMUsage{
+			InputTokens:  int(v.UsageMetadata.PromptTokenCount),
+			OutputTokens: int(v.UsageMetadata.CandidatesTokenCount),
+		}
+	}
+	r.Details = v.Candidates
+}
+
+type LLMUsage struct {
 	InputTokens  int `json:"input_tokens,omitempty"`
 	OutputTokens int `json:"output_tokens,omitempty"`
 }
@@ -175,12 +190,12 @@ func (m Message) ToAnthropic(dist *anthropic.Message) {
 		buf := new(bytes.Buffer)
 		for _, img := range images {
 			buf.Reset()
-			png.Encode(buf, img)
+			jpeg.Encode(buf, img, nil)
 			encodedString := base64.StdEncoding.EncodeToString(buf.Bytes())
 			imgSource := anthropic.MessageContentSource{
 				Type:      "base64",
-				MediaType: "image/png",
-				Data:      fmt.Sprintf("data:image/png;base64,%s", encodedString),
+				MediaType: "image/jpeg",
+				Data:      fmt.Sprintf("data:image/jpeg;base64,%s", encodedString),
 			}
 			dist.Content = append(dist.Content, anthropic.NewImageMessageContent(imgSource))
 		}
@@ -222,6 +237,34 @@ func (m Message) ToCohere(dist *cohere.Message) {
 	}
 }
 
+// ToGemini convert message to openai Content
+func (m Message) ToGemini(dist *gemini.Content) {
+	dist.Role = m.role
+	if dist.Role == FunctionRole {
+		bs := schema.ToBytes(m.content)
+		resp := make(map[string]interface{})
+		if err := json.Unmarshal(bs, &resp); err == nil {
+			dist.Parts = append(dist.Parts, gemini.FunctionResponse{
+				Response: resp,
+			})
+			return
+		}
+	}
+	dist.Parts = append(dist.Parts, gemini.Text(schema.Stringify(m.content)))
+	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
+		images := getImages(attachement.ImageURLs)
+		dist.Parts = make([]gemini.Part, 0, len(images)+1)
+		buf := new(bytes.Buffer)
+		for _, img := range images {
+			buf.Reset()
+			jpeg.Encode(buf, img, nil)
+			bs := make([]byte, buf.Len())
+			copy(bs, buf.Bytes())
+			dist.Parts = append(dist.Parts, gemini.ImageData("jpeg", bs))
+		}
+	}
+}
+
 func getImages(urls []string) []image.Image {
 	imgs := make([]image.Image, len(urls))
 	for _, link := range urls {
@@ -233,14 +276,44 @@ func getImages(urls []string) []image.Image {
 }
 
 func getImage(imgURL string) (image.Image, error) {
+	var r io.Reader
+	if strings.HasPrefix(imgURL, "data") && strings.Contains(imgURL, ";base64,") {
+		parts := strings.Split(imgURL, ",")
+		if len(parts) != 2 {
+			return nil, errors.New("invalid image url")
+		}
+		bs, err := base64.StdEncoding.DecodeString(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(bs)
+	} else {
+		resp, err := http.Get(imgURL)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		r = resp.Body
+	}
+	img, _, err := image.Decode(r)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+func getImageData(imgURL string) ([]byte, error) {
+	if strings.HasPrefix(imgURL, "data") && strings.Contains(imgURL, ";base64,") {
+		parts := strings.Split(imgURL, ",")
+		if len(parts) != 2 {
+			return nil, errors.New("invalid image url")
+		}
+		return base64.StdEncoding.DecodeString(strings.TrimSpace(parts[1]))
+	}
 	resp, err := http.Get(imgURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	img, _, err := image.Decode(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return img, nil
+	return io.ReadAll(resp.Body)
 }

@@ -1,7 +1,7 @@
 package agents
 
 import (
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"

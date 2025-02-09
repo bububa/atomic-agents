@@ -8,7 +8,7 @@ import (
 	"github.com/bububa/atomic-agents/components/systemprompt"
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools"
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 )
 
 // ToolAgent represent agent with tool callback
@@ -18,8 +18,8 @@ type ToolAgent[I schema.Schema, T schema.Schema, O schema.Schema] struct {
 	end       *Agent[I, O]
 	tool      tools.AnonymousTool
 	startHook func(context.Context, *ToolAgent[I, T, O], *I)
-	endHook   func(context.Context, *ToolAgent[I, T, O], *I, *O, *components.ApiResponse)
-	errorHook func(context.Context, *ToolAgent[I, T, O], *I, *components.ApiResponse, error)
+	endHook   func(context.Context, *ToolAgent[I, T, O], *I, *O, *components.LLMResponse)
+	errorHook func(context.Context, *ToolAgent[I, T, O], *I, *components.LLMResponse, error)
 }
 
 // NewToolAgent returns a new ToolAgent instance
@@ -82,11 +82,11 @@ func (t *ToolAgent[I, T, O]) SetStartHook(fn func(context.Context, *ToolAgent[I,
 	t.startHook = fn
 }
 
-func (t *ToolAgent[I, T, O]) SetEndHook(fn func(context.Context, *ToolAgent[I, T, O], *I, *O, *components.ApiResponse)) {
+func (t *ToolAgent[I, T, O]) SetEndHook(fn func(context.Context, *ToolAgent[I, T, O], *I, *O, *components.LLMResponse)) {
 	t.endHook = fn
 }
 
-func (t *ToolAgent[I, T, O]) SetErrorHook(fn func(context.Context, *ToolAgent[I, T, O], *I, *components.ApiResponse, error)) {
+func (t *ToolAgent[I, T, O]) SetErrorHook(fn func(context.Context, *ToolAgent[I, T, O], *I, *components.LLMResponse, error)) {
 	t.errorHook = fn
 }
 
@@ -102,11 +102,11 @@ func (t *ToolAgent[I, T, O]) SetStartAgentStartHook(fn func(context.Context, *Ag
 	t.start.SetStartHook(fn)
 }
 
-func (t *ToolAgent[I, T, O]) SetStartAgentEndHook(fn func(context.Context, *Agent[I, T], *I, *T, *components.ApiResponse)) {
+func (t *ToolAgent[I, T, O]) SetStartAgentEndHook(fn func(context.Context, *Agent[I, T], *I, *T, *components.LLMResponse)) {
 	t.start.SetEndHook(fn)
 }
 
-func (t *ToolAgent[I, T, O]) SetStartAgentErrorHook(fn func(context.Context, *Agent[I, T], *I, *components.ApiResponse, error)) {
+func (t *ToolAgent[I, T, O]) SetStartAgentErrorHook(fn func(context.Context, *Agent[I, T], *I, *components.LLMResponse, error)) {
 	t.start.SetErrorHook(fn)
 }
 
@@ -114,11 +114,11 @@ func (t *ToolAgent[I, T, O]) SetEndAgentStartHook(fn func(context.Context, *Agen
 	t.end.SetStartHook(fn)
 }
 
-func (t *ToolAgent[I, T, O]) SetEndAgentEndHook(fn func(context.Context, *Agent[I, O], *I, *O, *components.ApiResponse)) {
+func (t *ToolAgent[I, T, O]) SetEndAgentEndHook(fn func(context.Context, *Agent[I, O], *I, *O, *components.LLMResponse)) {
 	t.end.SetEndHook(fn)
 }
 
-func (t *ToolAgent[I, T, O]) SetEndAgentErrorHook(fn func(context.Context, *Agent[I, O], *I, *components.ApiResponse, error)) {
+func (t *ToolAgent[I, T, O]) SetEndAgentErrorHook(fn func(context.Context, *Agent[I, O], *I, *components.LLMResponse, error)) {
 	t.end.SetErrorHook(fn)
 }
 
@@ -135,7 +135,7 @@ func (t *ToolAgent[I, T, O]) SetToolErrorHook(fn func(context.Context, tools.Ano
 }
 
 // Run runs the chat agent with the given user input synchronously.
-func (t *ToolAgent[I, T, O]) Run(ctx context.Context, userInput *I, output *O, apiResp *components.ApiResponse) error {
+func (t *ToolAgent[I, T, O]) Run(ctx context.Context, userInput *I, output *O, apiResp *components.LLMResponse) error {
 	toolOutput := new(T)
 	if fn := t.startHook; fn != nil {
 		fn(ctx, t, userInput)
@@ -175,7 +175,7 @@ func (t *ToolAgent[I, T, O]) Run(ctx context.Context, userInput *I, output *O, a
 }
 
 // Run runs the chat agent with the given user input for chain.
-func (t *ToolAgent[I, T, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.ApiResponse) (any, error) {
+func (t *ToolAgent[I, T, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := userInput.(*I)
 	if !ok {
 		return nil, errors.New("invalid input schema")
