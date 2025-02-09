@@ -3,7 +3,8 @@ package examples
 import (
 	"os"
 
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
+	"github.com/bububa/instructor-go/instructors"
 	cohereClient "github.com/cohere-ai/cohere-go/v2/client"
 	cohereOption "github.com/cohere-ai/cohere-go/v2/option"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
@@ -20,7 +21,7 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			opts = append(opts, anthropic.WithBaseURL(baseURL))
 		}
 		clt := anthropic.NewClient(authToken, opts...)
-		return instructor.FromAnthropic(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromAnthropic(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
 	case instructor.ProviderCohere:
 		authToken := os.Getenv("COHERE_API_KEY")
 		baseURL := os.Getenv("COHERE_API_BASE_URL")
@@ -30,7 +31,7 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			opts = append(opts, cohereOption.WithBaseURL(baseURL))
 		}
 		clt := cohereClient.NewClient(opts...)
-		return instructor.FromCohere(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromCohere(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
 	default:
 		authToken := os.Getenv("OPENAI_API_KEY")
 		baseURL := os.Getenv("OPENAI_API_BASE_URL")
@@ -39,6 +40,6 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			cfg.BaseURL = baseURL
 		}
 		clt := openai.NewClientWithConfig(cfg)
-		return instructor.FromOpenAI(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromOpenAI(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
 	}
 }

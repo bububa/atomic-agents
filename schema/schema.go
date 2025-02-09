@@ -20,3 +20,11 @@ func Stringify(s Schema) string {
 	bs, _ := json.Marshal(s)
 	return string(bs)
 }
+
+func ToBytes(s Schema) []byte {
+	if v, ok := s.(String); ok {
+		return []byte(v)
+	}
+	bs, _ := json.Marshal(s)
+	return bs
+}

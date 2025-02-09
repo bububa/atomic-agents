@@ -31,7 +31,7 @@ func (a *OrchestrationAgent[I, O]) SetName(name string) {
 	a.name = name
 }
 
-func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O, apiResp *components.ApiResponse) error {
+func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O, apiResp *components.LLMResponse) error {
 	fn, params, err := a.selector(input)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O,
 	return nil
 }
 
-func (a *OrchestrationAgent[I, O]) RunForChain(ctx context.Context, input any, apiResp *components.ApiResponse) (any, error) {
+func (a *OrchestrationAgent[I, O]) RunForChain(ctx context.Context, input any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := input.(*I)
 	if !ok {
 		return nil, errors.New("invalid agent input schema")

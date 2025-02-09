@@ -16,7 +16,7 @@ import (
 	"github.com/bububa/atomic-agents/tools/calculator"
 	"github.com/bububa/atomic-agents/tools/orchestration"
 	"github.com/bububa/atomic-agents/tools/searxng"
-	"github.com/bububa/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 )
 
 // Input schema for the Orchestrator Agent. Contains the user's message to be processed.
