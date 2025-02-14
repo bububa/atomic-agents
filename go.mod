@@ -6,7 +6,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.2.2
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/PuerkitoBio/goquery v1.10.2
-	github.com/bububa/instructor-go v1.0.9
+	github.com/bububa/instructor-go v1.1.0
 	github.com/cohere-ai/cohere-go/v2 v2.12.4
 	github.com/gabriel-vasile/mimetype v1.4.8
 	github.com/go-playground/validator/v10 v10.24.0
@@ -41,6 +41,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kaptinlin/jsonrepair v0.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
