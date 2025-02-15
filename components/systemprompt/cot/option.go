@@ -1,4 +1,6 @@
-package systemprompt
+package cot
+
+import "github.com/bububa/atomic-agents/components/systemprompt"
 
 type Option = func(g *Generator)
 
@@ -24,8 +26,8 @@ func WithOutputInstructs(outputInstructs []string) Option {
 }
 
 // WithContextProviders set Generator context pproviders
-func WithContextProviders(providers ...ContextProvider) Option {
+func WithContextProviders(providers ...systemprompt.ContextProvider) Option {
 	return func(g *Generator) {
-		g.contextProviders = append(g.contextProviders, providers...)
+		g.AddContextProviders(providers...)
 	}
 }

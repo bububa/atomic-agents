@@ -2,15 +2,31 @@ package agents
 
 import (
 	"context"
+	"errors"
 
-	"github.com/instructor-ai/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
+	"github.com/bububa/instructor-go/instructors/gemini"
+	cohere "github.com/cohere-ai/cohere-go/v2"
+	geminiAPI "github.com/google/generative-ai-go/genai"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	openai "github.com/sashabaranov/go-openai"
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
+	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/schema"
 )
+
+type MergeResponse = func(*components.LLMResponse)
+
+type IAgent interface {
+	Name() string
+}
+
+type ChainableAgent interface {
+	IAgent
+	RunForChain(context.Context, any, *components.LLMResponse) (any, error)
+}
 
 type AgentSetter interface {
 	SetClient(clt instructor.Instructor)
@@ -28,7 +44,7 @@ type Config struct {
 	//	memory  Memory component for storing chat history.
 	memory *components.Memory
 	//	systemPromptGenerator Component for generating system prompts.
-	systemPromptGenerator *systemprompt.Generator
+	systemPromptGenerator systemprompt.Generator
 	// initialMemory (AgentMemory): Initial state of the memory
 	initialMemory *components.Memory
 	// currentUserInput
@@ -39,13 +55,18 @@ type Config struct {
 	temperature float32
 	// maxTokens Maximum number of tokens allowed in the response
 	maxTokens int
+	// name is Agent name presentation
+	name string
 }
 
 // Agent class for chat agents.
 // This class provides the core functionality for handling chat interactions, including managing memory,
 // generating system prompts, and obtaining responses from a language model.
-type Agent[T schema.Schema, O schema.Schema] struct {
+type Agent[I schema.Schema, O schema.Schema] struct {
 	Config
+	startHook func(context.Context, *Agent[I, O], *I)
+	endHook   func(context.Context, *Agent[I, O], *I, *O, *components.LLMResponse)
+	errorHook func(context.Context, *Agent[I, O], *I, *components.LLMResponse, error)
 }
 
 // NewAgent initializes the AgentAgent
@@ -58,7 +79,7 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 		ret.memory = components.NewMemory(0)
 	}
 	if ret.systemPromptGenerator == nil {
-		ret.systemPromptGenerator = systemprompt.NewGenerator()
+		ret.systemPromptGenerator = cot.New()
 	}
 	ret.initialMemory = components.NewMemory(0)
 	ret.memory.Copy(ret.initialMemory)
@@ -67,7 +88,7 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 
 // ResetMemory resets the memory to its initial state
 func (a *Agent[I, O]) ResetMemory() {
-	a.initialMemory.Copy(a.memory)
+	a.memory.Reset()
 }
 
 func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
@@ -78,7 +99,7 @@ func (a *Agent[I, O]) SetMemory(m *components.Memory) {
 	a.memory = m
 }
 
-func (a *Agent[I, O]) SetSystemPromptGenerator(g *systemprompt.Generator) {
+func (a *Agent[I, O]) SetSystemPromptGenerator(g systemprompt.Generator) {
 	a.systemPromptGenerator = g
 }
 
@@ -94,14 +115,43 @@ func (a *Agent[I, O]) SetMaxTokens(maxTokens int) {
 	a.maxTokens = maxTokens
 }
 
+func (a Agent[I, O]) Name() string {
+	return a.name
+}
+
+func (a *Agent[I, O]) SetName(name string) {
+	a.name = name
+}
+
+func (a *Agent[I, O]) SetStartHook(fn func(context.Context, *Agent[I, O], *I)) {
+	a.startHook = fn
+}
+
+func (a *Agent[I, O]) SetEndHook(fn func(context.Context, *Agent[I, O], *I, *O, *components.LLMResponse)) {
+	a.endHook = fn
+}
+
+func (a *Agent[I, O]) SetErrorHook(fn func(context.Context, *Agent[I, O], *I, *components.LLMResponse, error)) {
+	a.errorHook = fn
+}
+
 // Response obtains a response from the language model synchronously
-func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
+func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmResponse *components.LLMResponse) error {
+	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	var history []components.Message
+	if userInput != nil {
+		a.memory.NewTurn()
+		a.memory.NewMessage(components.UserRole, *userInput)
+		history = make([]components.Message, a.memory.MessageCount())
+		copy(history, a.memory.History())
+	} else {
+		history = a.memory.History()
+	}
 	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
-	msg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
-	messages = append(messages, *msg)
+	messages = append(messages, *sysMsg)
 	messages = append(messages, a.memory.History()...)
 	switch clt := a.client.(type) {
-	case *instructor.InstructorOpenAI:
+	case instructor.ChatInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
 		chatReq := openai.ChatCompletionRequest{
 			Model:               a.model,
 			Temperature:         a.temperature,
@@ -112,10 +162,15 @@ func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
 			msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
 		}
-		return clt.CreateChatCompletion(ctx, chatReq, response)
-	case *instructor.InstructorAnthropic:
+		res := new(openai.ChatCompletionResponse)
+		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
+			return err
+		} else if llmResponse != nil {
+			llmResponse.FromOpenAI(res)
+		}
+	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		chatReq := anthropic.MessagesRequest{
-			Model:       a.model,
+			Model:       anthropic.Model(a.model),
 			Temperature: &a.temperature,
 			MaxTokens:   a.maxTokens,
 		}
@@ -124,19 +179,408 @@ func (a *Agent[I, O]) response(ctx context.Context, response *O) (any, error) {
 			msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
 		}
-		return clt.CreateMessages(ctx, chatReq, response)
+		res := new(anthropic.MessagesResponse)
+		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
+			return err
+		} else if llmResponse != nil {
+			llmResponse.FromAnthropic(res)
+		}
+	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		lastIdx := len(messages) - 2
+		temperature := float64(a.temperature)
+		chatReq := cohere.ChatRequest{
+			Model:       &a.model,
+			Temperature: &temperature,
+			MaxTokens:   &a.maxTokens,
+			Message:     schema.Stringify(messages[lastIdx].Content()),
+		}
+		for idx, msg := range messages {
+			if idx >= lastIdx {
+				break
+			}
+			v := new(cohere.Message)
+			msg.ToCohere(v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+		}
+		res := new(cohere.NonStreamedChatResponse)
+		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
+			return err
+		} else if llmResponse != nil {
+			llmResponse.FromCohere(res)
+		}
+	case instructor.ChatInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+		chatReq := gemini.Request{
+			Model: a.model,
+		}
+		{
+			v := new(geminiAPI.Content)
+			sysMsg.ToGemini(v)
+			chatReq.System = v
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			userMsg.ToGemini(v)
+			chatReq.Parts = append(chatReq.Parts, v.Parts...)
+		}
+		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
+		for _, msg := range history {
+			v := new(geminiAPI.Content)
+			msg.ToGemini(v)
+			chatReq.History = append(chatReq.History, v)
+		}
+		res := new(geminiAPI.GenerateContentResponse)
+		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
+			return err
+		} else if llmResponse != nil {
+			llmResponse.FromGemini(res)
+		}
 	}
-	return nil, nil
+	if llmResponse != nil && llmResponse.Model == "" {
+		llmResponse.Model = a.model
+	}
+	return nil
 }
 
-// Run runs the chat agent with the given user input synchronously.
-func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O) error {
+// Response obtains a response from the language model synchronously
+func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, MergeResponse, error) {
+	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	var history []components.Message
 	if userInput != nil {
 		a.memory.NewTurn()
 		a.memory.NewMessage(components.UserRole, *userInput)
+		history = make([]components.Message, a.memory.MessageCount())
+		copy(history, a.memory.History())
+	} else {
+		history = a.memory.History()
 	}
-	_, err := a.response(ctx, output)
-	return err
+	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
+	messages = append(messages, *sysMsg)
+	messages = append(messages, a.memory.History()...)
+	switch clt := a.client.(type) {
+	case instructor.StreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
+		llmResp := new(openai.ChatCompletionResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromOpenAI(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := openai.ChatCompletionRequest{
+			Model:               a.model,
+			Temperature:         a.temperature,
+			MaxCompletionTokens: a.maxTokens,
+		}
+		for _, msg := range messages {
+			v := new(openai.ChatCompletionMessage)
+			msg.ToOpenAI(v)
+			chatReq.Messages = append(chatReq.Messages, *v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.StreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		llmResp := new(anthropic.MessagesResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromAnthropic(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := anthropic.MessagesRequest{
+			Model:       anthropic.Model(a.model),
+			Temperature: &a.temperature,
+			MaxTokens:   a.maxTokens,
+		}
+		for _, msg := range messages {
+			v := new(anthropic.Message)
+			msg.ToAnthropic(v)
+			chatReq.Messages = append(chatReq.Messages, *v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.StreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		llmResp := new(cohere.NonStreamedChatResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromCohere(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		lastIdx := len(messages) - 2
+		temperature := float64(a.temperature)
+		chatReq := cohere.ChatRequest{
+			Model:       &a.model,
+			Temperature: &temperature,
+			MaxTokens:   &a.maxTokens,
+			Message:     schema.Stringify(messages[lastIdx].Content()),
+		}
+		for idx, msg := range messages {
+			if idx >= lastIdx {
+				break
+			}
+			v := new(cohere.Message)
+			msg.ToCohere(v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.StreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+		llmResp := new(geminiAPI.GenerateContentResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromGemini(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := gemini.Request{
+			Model: a.model,
+		}
+		{
+
+			v := new(geminiAPI.Content)
+			sysMsg.ToGemini(v)
+			chatReq.System = v
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			userMsg.ToGemini(v)
+			chatReq.Parts = append(chatReq.Parts, v.Parts...)
+		}
+		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
+		for _, msg := range history {
+			v := new(geminiAPI.Content)
+			msg.ToGemini(v)
+			chatReq.History = append(chatReq.History, v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	}
+	return nil, nil, errors.New("unknown instructor provider")
+}
+
+// Response obtains a response from the language model synchronously
+func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	var history []components.Message
+	if userInput != nil {
+		a.memory.NewTurn()
+		a.memory.NewMessage(components.UserRole, *userInput)
+		history = make([]components.Message, a.memory.MessageCount())
+		copy(history, a.memory.History())
+	} else {
+		history = a.memory.History()
+	}
+	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
+	messages = append(messages, *sysMsg)
+	messages = append(messages, a.memory.History()...)
+	var responseType O
+	switch clt := a.client.(type) {
+	case instructor.JSONStreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
+		llmResp := new(openai.ChatCompletionResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromOpenAI(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := openai.ChatCompletionRequest{
+			Model:               a.model,
+			Temperature:         a.temperature,
+			MaxCompletionTokens: a.maxTokens,
+		}
+		for _, msg := range messages {
+			v := new(openai.ChatCompletionMessage)
+			msg.ToOpenAI(v)
+			chatReq.Messages = append(chatReq.Messages, *v)
+		}
+		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.JSONStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		llmResp := new(anthropic.MessagesResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromAnthropic(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := anthropic.MessagesRequest{
+			Model:       anthropic.Model(a.model),
+			Temperature: &a.temperature,
+			MaxTokens:   a.maxTokens,
+		}
+		for _, msg := range messages {
+			v := new(anthropic.Message)
+			msg.ToAnthropic(v)
+			chatReq.Messages = append(chatReq.Messages, *v)
+		}
+		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.JSONStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		llmResp := new(cohere.NonStreamedChatResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromCohere(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		lastIdx := len(messages) - 2
+		temperature := float64(a.temperature)
+		chatReq := cohere.ChatRequest{
+			Model:       &a.model,
+			Temperature: &temperature,
+			MaxTokens:   &a.maxTokens,
+			Message:     schema.Stringify(messages[lastIdx].Content()),
+		}
+		for idx, msg := range messages {
+			if idx >= lastIdx {
+				break
+			}
+			v := new(cohere.Message)
+			msg.ToCohere(v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+		}
+		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.JSONStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+		llmResp := new(geminiAPI.GenerateContentResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			resp.FromGemini(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := gemini.Request{
+			Model: a.model,
+		}
+		{
+
+			v := new(geminiAPI.Content)
+			sysMsg.ToGemini(v)
+			chatReq.System = v
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			userMsg.ToGemini(v)
+			chatReq.Parts = append(chatReq.Parts, v.Parts...)
+		}
+		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
+		for _, msg := range history {
+			v := new(geminiAPI.Content)
+			msg.ToGemini(v)
+			chatReq.History = append(chatReq.History, v)
+		}
+		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	}
+	return nil, nil, errors.New("unknown instructor provider")
+}
+
+// Run runs the chat agent with the given user input synchronously.
+func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp *components.LLMResponse) error {
+	if fn := a.startHook; fn != nil {
+		fn(ctx, a, userInput)
+	}
+	if err := a.chat(ctx, userInput, output, apiResp); err != nil {
+		if fn := a.errorHook; fn != nil {
+			fn(ctx, a, userInput, apiResp, err)
+		}
+		return err
+	}
+	mode := a.client.Mode()
+	if mode == instructor.ModeToolCall || mode == instructor.ModeToolCallStrict {
+		a.memory.NewMessage(components.FunctionRole, *output)
+	} else {
+		a.memory.NewMessage(components.AssistantRole, *output)
+	}
+	if fn := a.endHook; fn != nil {
+		fn(ctx, a, userInput, output, apiResp)
+	}
+	return nil
+}
+
+// Run runs the chat agent with the given user input for chain.
+func (a *Agent[I, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
+	in, ok := userInput.(*I)
+	if !ok {
+		return nil, errors.New("invalid input schema")
+	}
+	out := new(O)
+	if err := a.Run(ctx, in, out, apiResp); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Run runs the chat agent with the given user input synchronously.
+func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan string, MergeResponse, error) {
+	if fn := a.startHook; fn != nil {
+		fn(ctx, a, userInput)
+	}
+	if userInput != nil {
+		a.memory.NewTurn()
+	}
+	ch, mergeResp, err := a.stream(ctx, userInput)
+	if err != nil {
+		if fn := a.errorHook; fn != nil {
+			fn(ctx, a, userInput, nil, err)
+		}
+		return nil, mergeResp, err
+	}
+	if fn := a.endHook; fn != nil {
+		fn(ctx, a, userInput, nil, nil)
+	}
+	return ch, mergeResp, nil
+}
+
+// Run runs the chat agent with the given user input synchronously.
+func (a *Agent[I, O]) JSONStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+	if fn := a.startHook; fn != nil {
+		fn(ctx, a, userInput)
+	}
+	if userInput != nil {
+		a.memory.NewTurn()
+	}
+	ch, mergeResp, err := a.jsonStream(ctx, userInput)
+	if err != nil {
+		if fn := a.errorHook; fn != nil {
+			fn(ctx, a, userInput, nil, err)
+		}
+		return nil, mergeResp, err
+	}
+	if fn := a.endHook; fn != nil {
+		fn(ctx, a, userInput, nil, nil)
+	}
+	return ch, mergeResp, nil
+}
+
+func (a *Agent[I, O]) NewMessage(role components.MessageRole, content schema.Schema) *components.Message {
+	return a.memory.NewMessage(role, content)
 }
 
 // SystemPromptContextProvider returns agent systemPromptGenerator's context provider

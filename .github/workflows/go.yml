@@ -37,6 +37,8 @@ jobs:
 
       - name: Test
         env:
-          APPKEY: ${{ secrets.APPKEY }}
-          SECRET: ${{ secrets.APP_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE_URL: ${{ secrets.OPENAI_API_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_VISION_MODEL: ${{ secrets.OPENAI_VISION_MODEL }}
         run: go test -v ./...

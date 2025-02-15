@@ -2,12 +2,13 @@ package calculator
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 
 	"github.com/Knetic/govaluate"
 
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools"
+	"github.com/bububa/atomic-agents/tools/calculator/functions"
 )
 
 // Input Tool for performing calculations. Supports basic arithmetic operations
@@ -17,7 +18,7 @@ import (
 type Input struct {
 	schema.Base
 	// Expression Mathematical expression to evaluate. For example, '2 + 2'.
-	Expression string `json:"expression,omitempty" jsonschema:"title=expression,description=Mathematical expression to evaluate. For example, '2 + 2'."`
+	Expression string `json:"expression" jsonschema:"title=expression,description=Mathematical expression to evaluate. For example, '2 + 2'."`
 	// Params represents expressions's parameters
 	Params map[string]interface{} `json:"params,omitempty" jsonschema:"title=params,description=Parameters for the expression."`
 }
@@ -27,11 +28,6 @@ func NewInput(exp string, params map[string]interface{}) *Input {
 		Expression: exp,
 		Params:     params,
 	}
-}
-
-func (s Input) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
 }
 
 // Output Schema for the output of the CalculatorTool
@@ -47,17 +43,12 @@ func NewOutput(result interface{}) *Output {
 	}
 }
 
-func (s Output) String() string {
-	bs, _ := json.Marshal(s)
-	return string(bs)
-}
-
-type Calculator struct {
+type Tool struct {
 	tools.Config
 }
 
-func New(opts ...tools.Option) *Calculator {
-	ret := new(Calculator)
+func New(opts ...tools.Option) *Tool {
+	ret := new(Tool)
 	for _, opt := range opts {
 		opt(&ret.Config)
 	}
@@ -68,14 +59,51 @@ func New(opts ...tools.Option) *Calculator {
 }
 
 // Executes the CalculatorTool with the given parameters.
-func (t *Calculator) Run(ctx context.Context, input *Input) (*Output, error) {
-	exp, err := govaluate.NewEvaluableExpression(input.Expression)
+func (t *Tool) Run(ctx context.Context, input *Input, output *Output) error {
+	exp, err := govaluate.NewEvaluableExpressionWithFunctions(input.Expression, functions.Functions)
 	if err != nil {
+		return err
+	}
+	params := make(map[string]interface{}, len(input.Params)+len(constParams))
+	for k, v := range input.Params {
+		params[k] = v
+	}
+	for k, v := range constParams {
+		if _, ok := params[k]; ok {
+			continue
+		}
+		params[k] = v
+	}
+	result, err := exp.Evaluate(params)
+	if err != nil {
+		return err
+	}
+	*output = *NewOutput(result)
+	return nil
+}
+
+// RunAnonymous run tool for tools ochestration
+func (t *Tool) RunAnonymous(ctx context.Context, input any) (any, error) {
+	if fn := t.StartHook(); fn != nil {
+		fn(ctx, t, input)
+	}
+	in, ok := input.(*Input)
+	if !ok {
+		err := errors.New("invalid tool input schema")
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
 		return nil, err
 	}
-	result, err := exp.Evaluate(input.Params)
-	if err != nil {
+	out := new(Output)
+	if err := t.Run(ctx, in, out); err != nil {
+		if fn := t.ErrorHook(); fn != nil {
+			fn(ctx, t, input, err)
+		}
 		return nil, err
 	}
-	return NewOutput(result), nil
+	if fn := t.EndHook(); fn != nil {
+		fn(ctx, t, input, out)
+	}
+	return out, nil
 }

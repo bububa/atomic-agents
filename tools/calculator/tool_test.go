@@ -9,8 +9,8 @@ import (
 func Test(t *testing.T) {
 	ctx := context.Background()
 	tool := New()
-	ret, err := tool.Run(ctx, NewInput("2+2", nil))
-	if err != nil {
+	ret := new(Output)
+	if err := tool.Run(ctx, NewInput("2+2", nil), ret); err != nil {
 		t.Error(err)
 	}
 	switch value := ret.Result.(type) {
@@ -30,7 +30,8 @@ func Test(t *testing.T) {
 func ExampleCalculator() {
 	ctx := context.Background()
 	tool := New()
-	ret, _ := tool.Run(ctx, NewInput("2+2", nil))
+	ret := new(Output)
+	tool.Run(ctx, NewInput("2+2", nil), ret)
 	fmt.Println(ret.Result)
 	// Output:
 	// 4

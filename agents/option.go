@@ -1,7 +1,7 @@
 package agents
 
 import (
-	"github.com/instructor-ai/instructor-go/pkg/instructor"
+	"github.com/bububa/instructor-go"
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
@@ -21,7 +21,7 @@ func WithMemory(m *components.Memory) Option {
 	}
 }
 
-func WithSystemPromptGenerator(g *systemprompt.Generator) Option {
+func WithSystemPromptGenerator(g systemprompt.Generator) Option {
 	return func(c *Config) {
 		c.systemPromptGenerator = g
 	}
@@ -42,5 +42,11 @@ func WithTemperature(temperature float32) Option {
 func WithMaxTokens(maxTokens int) Option {
 	return func(c *Config) {
 		c.maxTokens = maxTokens
+	}
+}
+
+func WithName(name string) Option {
+	return func(c *Config) {
+		c.name = name
 	}
 }

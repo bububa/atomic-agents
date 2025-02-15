@@ -1,65 +1,30 @@
 package systemprompt
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
-// Generator is system prompt generator
-type Generator struct {
-	background       []string
-	steps            []string
-	outputInstructs  []string
+// Generator is system prompt generator framework
+type Generator interface {
+	Generate() string
+	// ContextProvider retrieves a context provider by name.
+	// If the context provider is not found returns not found error
+	ContextProvider(title string) (ContextProvider, error)
+	// AddContextProviders registers new context providers
+	AddContextProviders(providers ...ContextProvider)
+	// RemoveContextProviders Unregisters an existing context provider.
+	RemoveContextProviders(titles ...string)
+}
+
+type BaseGenerator struct {
 	contextProviders []ContextProvider
 }
 
-// NewGenerator returns a new system prompt Generator
-func NewGenerator(options ...Option) *Generator {
-	ret := new(Generator)
-	for _, opt := range options {
-		opt(ret)
-	}
-	if len(ret.background) == 0 {
-		ret.background = []string{"This is a conversation with a helpful and friendly AI assistant."}
-	}
-	ret.outputInstructs = append(ret.outputInstructs, "Always respond using the proper JSON schema.", "Always use the available additional information and context to enhance the response.")
-	return ret
-}
-
-func (g *Generator) Generate() string {
-	var (
-		sections = map[string][]string{
-			"IDENTITY and PURPOSE":     g.background,
-			"INTERNAL ASSISTANT STEPS": g.steps,
-			"OUTPUT INSTRUCTIONS":      g.outputInstructs,
-		}
-		promptParts []string
-	)
-	for title, content := range sections {
-		if len(content) > 0 {
-			promptParts = append(promptParts, fmt.Sprintf("# %s", title))
-			for _, item := range content {
-				promptParts = append(promptParts, fmt.Sprintf("- %s", item))
-			}
-			promptParts = append(promptParts, "")
-		}
-	}
-	if len(g.contextProviders) > 0 {
-		promptParts = append(promptParts, "# EXTRA INFORMATION AND CONTEXT")
-		for _, provider := range g.contextProviders {
-			if info := provider.Info(); info != "" {
-				promptParts = append(promptParts, fmt.Sprintf("## %s", provider.Title()))
-				promptParts = append(promptParts, provider.Info())
-				promptParts = append(promptParts, "")
-			}
-		}
-	}
-	return strings.TrimSpace(strings.Join(promptParts, "\n"))
+func (g *BaseGenerator) ContextProviders() []ContextProvider {
+	return g.contextProviders
 }
 
 // ContextProvider retrieves a context provider by name.
 // If the context provider is not found returns not found error
-func (g *Generator) ContextProvider(title string) (ContextProvider, error) {
+func (g *BaseGenerator) ContextProvider(title string) (ContextProvider, error) {
 	for _, p := range g.contextProviders {
 		if p.Title() == title {
 			return p, nil
@@ -69,7 +34,7 @@ func (g *Generator) ContextProvider(title string) (ContextProvider, error) {
 }
 
 // AddContextProviders registers new context providers
-func (g *Generator) AddContextProviders(providers ...ContextProvider) {
+func (g *BaseGenerator) AddContextProviders(providers ...ContextProvider) {
 	for _, provider := range providers {
 		if _, err := g.ContextProvider(provider.Title()); err != nil {
 			g.contextProviders = append(g.contextProviders, provider)
@@ -77,14 +42,14 @@ func (g *Generator) AddContextProviders(providers ...ContextProvider) {
 	}
 }
 
-func (g *Generator) addContextProvider(provider ContextProvider) {
+func (g *BaseGenerator) addContextProvider(provider ContextProvider) {
 	if _, err := g.ContextProvider(provider.Title()); err != nil {
 		g.contextProviders = append(g.contextProviders, provider)
 	}
 }
 
 // RemoveContextProviders Unregisters an existing context provider.
-func (g *Generator) RemoveContextProviders(titles ...string) {
+func (g *BaseGenerator) RemoveContextProviders(titles ...string) {
 	l := len(titles)
 	if l == 1 {
 		g.removeContextProvider(titles[0])
@@ -103,7 +68,7 @@ func (g *Generator) RemoveContextProviders(titles ...string) {
 	g.contextProviders = providers
 }
 
-func (g *Generator) removeContextProvider(title string) {
+func (g *BaseGenerator) removeContextProvider(title string) {
 	found := -1
 	for idx, p := range g.contextProviders {
 		if p.Title() == title {
