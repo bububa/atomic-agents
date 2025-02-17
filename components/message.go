@@ -253,6 +253,11 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
+	if v, ok := src.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(src.content)
+	}
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
@@ -301,6 +306,11 @@ func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
 	}
 	dist.Role = anthropic.ChatRole(m.role)
 	txt := m.TryAttachChunkPrompt(idx)
+	if v, ok := src.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(src.content)
+	}
 	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
 		images := getImages(attachement.ImageURLs)
 		dist.Content = make([]anthropic.MessageContent, 0, len(images)+len(attachement.Files)+1)
@@ -356,6 +366,11 @@ func (m Message) toCohere(dist *cohere.Message, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
+	if v, ok := m.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(m.content)
+	}
 	switch m.role {
 	case SystemRole:
 		dist.Role = "SYSTEM"
@@ -402,9 +417,9 @@ func (m Message) toGemini(dist *gemini.Content, idx int) error {
 			return errors.New("invalid chunk index")
 		}
 	}
-	dist.Role = m.role
+	dist.Role = src.role
 	if dist.Role == FunctionRole {
-		bs := schema.ToBytes(m.content)
+		bs := schema.ToBytes(src.content)
 		resp := make(map[string]any)
 		if err := json.Unmarshal(bs, &resp); err == nil {
 			dist.Parts = append(dist.Parts, gemini.FunctionResponse{
@@ -414,6 +429,12 @@ func (m Message) toGemini(dist *gemini.Content, idx int) error {
 		}
 	}
 	txt := m.TryAttachChunkPrompt(idx)
+	dist.Parts = append(dist.Parts, gemini.Text(txt))
+	if v, ok := src.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(src.content)
+	}
 	dist.Parts = append(dist.Parts, gemini.Text(txt))
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		images := getImages(attachement.ImageURLs)
