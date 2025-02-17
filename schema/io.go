@@ -15,6 +15,10 @@ func NewInput(chatMessage string) *Input {
 	return ret
 }
 
+func (i Input) ToMarkdown() string {
+	return SchemaToMarkdown(i)
+}
+
 // CreateeInput returns a BaseAgentInput
 func CreateInput(chatMessage string) Input {
 	return Input{
