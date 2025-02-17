@@ -162,11 +162,17 @@ func (m Message) TurnID() string {
 // ToOpenAI convert message to openai ChatCompletionMessage
 func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
 	dist.Role = m.role
+	var txt string
+	if v, ok := m.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(m.content)
+	}
 	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
 			Type: openai.ChatMessagePartTypeText,
-			Text: schema.Stringify(m.content),
+			Text: txt,
 		})
 		for _, imageURL := range attachement.ImageURLs {
 			dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
@@ -177,13 +183,19 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
 			})
 		}
 	} else {
-		dist.Content = schema.Stringify(m.content)
+		dist.Content = txt
 	}
 }
 
 // ToAnthropic convert message to anthropic Message
 func (m Message) ToAnthropic(dist *anthropic.Message) {
 	dist.Role = anthropic.ChatRole(m.role)
+	var txt string
+	if v, ok := m.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(m.content)
+	}
 	if attachement := m.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
 		images := getImages(attachement.ImageURLs)
 		dist.Content = make([]anthropic.MessageContent, 0, len(images)+len(attachement.Files)+1)
@@ -212,27 +224,33 @@ func (m Message) ToAnthropic(dist *anthropic.Message) {
 			dist.Content = append(dist.Content, anthropic.NewDocumentMessageContent(docSource))
 		}
 	}
-	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(schema.Stringify(m.content))}
+	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(txt)}
 }
 
 // ToCohere convert message to cohere Message
 func (m Message) ToCohere(dist *cohere.Message) {
 	dist.Role = m.role
+	var txt string
+	if v, ok := m.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(m.content)
+	}
 	switch m.role {
 	case SystemRole:
 		dist.Role = "SYSTEM"
 		dist.System = &cohere.ChatMessage{
-			Message: schema.Stringify(m.content),
+			Message: txt,
 		}
 	case AssistantRole:
 		dist.Role = "CHATBOT"
 		dist.System = &cohere.ChatMessage{
-			Message: schema.Stringify(m.content),
+			Message: txt,
 		}
 	case UserRole:
 		dist.Role = "USER"
 		dist.User = &cohere.ChatMessage{
-			Message: schema.Stringify(m.content),
+			Message: txt,
 		}
 	}
 }
@@ -250,7 +268,13 @@ func (m Message) ToGemini(dist *gemini.Content) {
 			return
 		}
 	}
-	dist.Parts = append(dist.Parts, gemini.Text(schema.Stringify(m.content)))
+	var txt string
+	if v, ok := m.content.(schema.Markdownable); ok {
+		txt = v.ToMarkdown()
+	} else {
+		txt = schema.Stringify(m.content)
+	}
+	dist.Parts = append(dist.Parts, gemini.Text(txt))
 	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		images := getImages(attachement.ImageURLs)
 		dist.Parts = make([]gemini.Part, 0, len(images)+1)
