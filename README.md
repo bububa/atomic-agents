@@ -47,7 +47,15 @@ go get -u github.com/bububa/atomic-agents
 Atomic Agents with the following main components:
 
 1. `agents/`: The core Atomic Agents library
-2. `components/`: The Atomic Agents components contains `Message`, `Memory`, `SystemPromptGenerator`, `SystemPromptContextProvider` utilities
+2. `components/`: The Atomic Agents components
+
+- `message`: Defines the Message structure for input/output
+- `memory`: Defines a in memory Memory Store
+- `systemprompt`: Contains SystemPrompt `Generator` and `ContextProvider`
+- `embedder`: Defines the embedder interface, contains several `Provider` including `OpenAI`, `Gemini`, `VoyageAI`, `HuggingFace`, `Cohere` implementations
+- `vectordb`: Defines a vectordb interface, contains several `Provider`s including `Memory`, `Chromem`, `Milvus`
+- `document` Defines a `Document` interface use for RAG, implemented `File`, `Http` document types. Provide a `Parser` interface which transform document content into specific string with `PDFParser` and `HTML to markdown` parsers implementations.
+
 3. `schema/`: Defines the Input/Output schema structures and interfaces
 4. `examples/`: Example projects showcasing Atomic Agents usage
 5. `tools/`: A collection of tools that can be used with Atomic Agents

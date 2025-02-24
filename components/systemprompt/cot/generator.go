@@ -15,6 +15,8 @@ type Generator struct {
 	outputInstructs []string
 }
 
+var _ systemprompt.Generator = (*Generator)(nil)
+
 // New returns a new system prompt Generator
 func New(options ...Option) *Generator {
 	ret := new(Generator)
