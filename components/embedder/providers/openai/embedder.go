@@ -15,6 +15,8 @@ type Embedder struct {
 	embedder.Options
 }
 
+var _ embedder.Embedder = (*Embedder)(nil)
+
 func (p *Embedder) SetClient(clt *openai.Client) {
 	p.Client = clt
 }

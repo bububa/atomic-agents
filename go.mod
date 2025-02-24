@@ -12,12 +12,14 @@ require (
 	github.com/go-playground/validator/v10 v10.25.0
 	github.com/google/generative-ai-go v0.19.0
 	github.com/google/uuid v1.6.0
+	github.com/ledongthuc/pdf v0.0.0-20240201131950-da5b75280b06
 	github.com/liushuangls/go-anthropic/v2 v2.13.1
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/rs/xid v1.6.0
 	github.com/sashabaranov/go-openai v1.37.0
+	go.uber.org/atomic v1.4.0
 )
 
 require (

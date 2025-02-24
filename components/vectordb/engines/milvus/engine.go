@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	milvusClient "github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 
@@ -15,6 +14,8 @@ type Engine struct {
 	db milvusClient.Client
 	vectordb.Options
 }
+
+var _ vectordb.Engine = (*Engine)(nil)
 
 func New(db milvusClient.Client, opts ...vectordb.Option) *Engine {
 	ret := &Engine{
@@ -40,7 +41,7 @@ func (e *Engine) CreateCollection(ctx context.Context, name string, dim int64) e
 	if err != nil {
 		return err
 	}
-	return e.db.CreateIndex(ctx, name, "embedding", idxHnsw, true, client.WithIndexName("embedding_idx"))
+	return e.db.CreateIndex(ctx, name, "embedding", idxHnsw, true, milvusClient.WithIndexName("embedding_idx"))
 }
 
 func (e *Engine) Insert(ctx context.Context, collectionName string, records []vectordb.Record) error {

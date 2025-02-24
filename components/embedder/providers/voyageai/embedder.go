@@ -13,6 +13,8 @@ type Embedder struct {
 	embedder.Options
 }
 
+var _ embedder.Embedder = (*Embedder)(nil)
+
 func (p *Embedder) SetClient(clt *Client) {
 	p.Client = clt
 }

@@ -13,6 +13,8 @@ type Engine struct {
 	vectordb.Options
 }
 
+var _ vectordb.Engine = (*Engine)(nil)
+
 func New(db *chromem.DB, opts ...vectordb.Option) *Engine {
 	ret := &Engine{
 		db: db,

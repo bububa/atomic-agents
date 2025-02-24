@@ -20,6 +20,8 @@ type Engine struct {
 	vectordb.Options
 }
 
+var _ vectordb.Engine = (*Engine)(nil)
+
 // Collection represents a named set of records with a defined schema.
 // It's the basic unit of organization in the memory database.
 type Collection struct {
@@ -102,8 +104,8 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 		return nil, err
 	}
 	records := filterRecords(col.Records(), &option)
-	for _, record := range records {
-		record.Score = calculateDistance(vectors, record.Embedding.Embedding)
+	for idx, record := range records {
+		records[idx].Score = calculateDistance(vectors, record.Embedding.Embedding)
 	}
 	sort.Slice(records, func(i, j int) bool {
 		return records[i].Score < records[j].Score
