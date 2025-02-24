@@ -24,12 +24,12 @@ func New(db *chromem.DB, opts ...vectordb.Option) *Engine {
 	return ret
 }
 
-func (e *Engine) Collection(name string) (*chromem.Collection, error) {
+func (e *Engine) Collection(_ context.Context, name string) (*chromem.Collection, error) {
 	return e.db.GetOrCreateCollection(name, nil, nil)
 }
 
 func (e *Engine) Insert(ctx context.Context, collectionName string, records []vectordb.Record) error {
-	col, err := e.Collection(collectionName)
+	col, err := e.Collection(ctx, collectionName)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 	for _, opt := range opts {
 		opt(&option)
 	}
-	col, err := e.Collection(option.Collection)
+	col, err := e.Collection(ctx, option.Collection)
 	if err != nil {
 		return nil, err
 	}
