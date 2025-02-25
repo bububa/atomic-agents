@@ -59,6 +59,9 @@ func NewHttp(opts ...HttpOption) (*Http, error) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
+	if cfg.method == "" {
+		cfg.method = http.MethodGet
+	}
 	if cfg.client == nil {
 		cfg.client = http.DefaultClient
 	}

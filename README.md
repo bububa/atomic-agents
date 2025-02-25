@@ -65,7 +65,12 @@ Atomic Agents with the following main components:
 - `systemprompt`: Contains SystemPrompt `Generator` and `ContextProvider`
 - `embedder`: Defines the embedder interface, contains several `Provider` including `OpenAI`, `Gemini`, `VoyageAI`, `HuggingFace`, `Cohere` implementations
 - `vectordb`: Defines a vectordb interface, contains several `Provider`s including `Memory`, `Chromem`, `Milvus`
-- `document` Defines a `Document` interface use for RAG, implemented `File`, `Http` document types. Provide a `Parser` interface which transform document content into specific string with `PDFParser` and `HTML to markdown` parsers implementations.
+- `document` Defines a `Document` interface use for RAG, implemented `File`, `Http` document types. Provide a `Parser` interface which transform document content into specific string
+  - `parsers/pdf`: a `PDF` parser
+  - `parsers/html`: a `HTML` parser
+  - `parsers/docx`: a `DOCx` parser
+  - `parsers/pptx`: a `PPTx` parser
+  - `parsers/xlsx`: a `XLSx` parser
 
 3. `schema/`: Defines the Input/Output schema structures and interfaces
 4. `examples/`: Example projects showcasing Atomic Agents usage
