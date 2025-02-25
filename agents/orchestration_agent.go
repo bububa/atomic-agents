@@ -9,7 +9,7 @@ import (
 )
 
 // AgentSelector will returns a Tool based on input param
-type AgentSelector[I schema.Schema] func(req *I) (ChainableAgent, any, error)
+type AgentSelector[I schema.Schema] func(req *I) (AnonymousAgent, any, error)
 
 // OrchestrationAgent is an agent for orchestration
 type OrchestrationAgent[I schema.Schema, O schema.Schema] struct {
@@ -36,7 +36,7 @@ func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O,
 	if err != nil {
 		return err
 	}
-	if out, err := fn.RunForChain(ctx, params, apiResp); err != nil {
+	if out, err := fn.RunAnonymous(ctx, params, apiResp); err != nil {
 		return err
 	} else if outO, ok := out.(*O); !ok {
 		return errors.New("invalid agent output schema")
@@ -46,7 +46,7 @@ func (a *OrchestrationAgent[I, O]) Run(ctx context.Context, input *I, output *O,
 	return nil
 }
 
-func (a *OrchestrationAgent[I, O]) RunForChain(ctx context.Context, input any, apiResp *components.LLMResponse) (any, error) {
+func (a *OrchestrationAgent[I, O]) RunAnonymous(ctx context.Context, input any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := input.(*I)
 	if !ok {
 		return nil, errors.New("invalid agent input schema")
@@ -55,5 +55,5 @@ func (a *OrchestrationAgent[I, O]) RunForChain(ctx context.Context, input any, a
 	if err != nil {
 		return nil, err
 	}
-	return fn.RunForChain(ctx, params, apiResp)
+	return fn.RunAnonymous(ctx, params, apiResp)
 }

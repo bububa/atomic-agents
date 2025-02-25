@@ -47,6 +47,17 @@ go get -u github.com/bububa/atomic-agents
 Atomic Agents with the following main components:
 
 1. `agents/`: The core Atomic Agents library
+
+- `Agent[I schema.Schema, O schema.Schema]`: generative basic Agent, contains interfaces:
+  - `TypeableAgent`
+  - `StreamableAgent`
+  - `AnonymousAgent`
+  - `AnonymousStreamableAgent`
+- `Chain[I schema.Schema, O schema.Schema]`: an Agent which is a agents chain
+- `OrchestrationAgent[I schema.Schema, O schema.Schema]`: orchestration Agent
+- `ToolAgent[I schema.Schema, T schema.Schema, O schema.Schema]`: Agent with tool
+- `RAG[O schema.Schema]`: RAG also implements `TypeableAgent`, `StreamableAgent`, `AnonymousAgent` and `AnonymousStreamableAgent` interfaces
+
 2. `components/`: The Atomic Agents components
 
 - `message`: Defines the Message structure for input/output

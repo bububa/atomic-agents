@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/bububa/instructor-go"
+
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
 	"github.com/bububa/atomic-agents/schema"
 	"github.com/bububa/atomic-agents/tools"
-	"github.com/bububa/instructor-go"
 )
 
 // ToolAgent represent agent with tool callback
@@ -175,7 +176,7 @@ func (t *ToolAgent[I, T, O]) Run(ctx context.Context, userInput *I, output *O, a
 }
 
 // Run runs the chat agent with the given user input for chain.
-func (t *ToolAgent[I, T, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
+func (t *ToolAgent[I, T, O]) RunAnonymous(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := userInput.(*I)
 	if !ok {
 		return nil, errors.New("invalid input schema")
