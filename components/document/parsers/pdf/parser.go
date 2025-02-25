@@ -1,4 +1,4 @@
-package document
+package pdf
 
 import (
 	"bytes"
@@ -6,25 +6,27 @@ import (
 	"io"
 
 	"github.com/ledongthuc/pdf"
+
+	"github.com/bububa/atomic-agents/components/document"
 )
 
-// PDFParser is a parser which parse PDF content to text
-type PDFParser struct {
+// Parser is a parser which parse PDF content to text
+type Parser struct {
 	password string
 }
 
-var _ Parser = (*PDFParser)(nil)
+var _ document.Parser = (*Parser)(nil)
 
-type PDFParserOption func(*PDFParser)
+type Option func(*Parser)
 
-func PDFParserWithPassword(password string) PDFParserOption {
-	return func(p *PDFParser) {
+func WithPassword(password string) Option {
+	return func(p *Parser) {
 		p.password = password
 	}
 }
 
-func NewPDFParser(opts ...PDFParserOption) *PDFParser {
-	ret := new(PDFParser)
+func NewPDFParser(opts ...Option) *Parser {
+	ret := new(Parser)
 	for _, opt := range opts {
 		opt(ret)
 	}
@@ -32,7 +34,7 @@ func NewPDFParser(opts ...PDFParserOption) *PDFParser {
 }
 
 // Parse try to parse a pdf content from a bytes.Reader and write to an io.Writer
-func (p *PDFParser) Parse(ctx context.Context, reader *bytes.Reader, writer io.Writer) error {
+func (p *Parser) Parse(ctx context.Context, reader *bytes.Reader, writer io.Writer) error {
 	var (
 		r    *pdf.Reader
 		err  error

@@ -44,7 +44,7 @@ func (e *Engine) CreateCollection(ctx context.Context, name string, dim int64) e
 	return e.db.CreateIndex(ctx, name, "embedding", idxHnsw, true, milvusClient.WithIndexName("embedding_idx"))
 }
 
-func (e *Engine) Insert(ctx context.Context, collectionName string, records []vectordb.Record) error {
+func (e *Engine) Insert(ctx context.Context, collectionName string, records ...vectordb.Record) error {
 	if len(records) == 0 {
 		return nil
 	}

@@ -38,7 +38,7 @@ func NewFile(fname string) (*File, error) {
 		fp:     fp,
 		Document: Document{
 			buffer: new(bytes.Buffer),
-			Meta: map[string]string{
+			meta: map[string]string{
 				"filename": fileInfo.Name(),
 				"modtime":  strconv.FormatInt(fileInfo.ModTime().Unix(), 10),
 			},

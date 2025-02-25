@@ -8,3 +8,7 @@ func (s String) Attachement() *Attachement {
 
 func (s String) SetAttachement(v *Attachement) {
 }
+
+func (s String) ToMarkdown() string {
+	return string(s)
+}

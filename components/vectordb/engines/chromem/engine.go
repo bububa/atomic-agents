@@ -30,7 +30,7 @@ func (e *Engine) Collection(_ context.Context, name string) (*chromem.Collection
 	return e.db.GetOrCreateCollection(name, nil, nil)
 }
 
-func (e *Engine) Insert(ctx context.Context, collectionName string, records []vectordb.Record) error {
+func (e *Engine) Insert(ctx context.Context, collectionName string, records ...vectordb.Record) error {
 	col, err := e.Collection(ctx, collectionName)
 	if err != nil {
 		return err

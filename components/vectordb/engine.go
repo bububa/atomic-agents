@@ -13,6 +13,6 @@ const (
 )
 
 type Engine interface {
-	Insert(context.Context, string, []Record) error
+	Insert(context.Context, string, ...Record) error
 	Search(context.Context, []float64, ...SearchOption) ([]Record, error)
 }

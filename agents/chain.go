@@ -11,14 +11,14 @@ import (
 // Chain agents chain
 type Chain[I schema.Schema, O schema.Schema] struct {
 	name      string
-	agents    []ChainableAgent
+	agents    []AnonymousAgent
 	startHook func(context.Context, *Chain[I, O], *I)
 	endHook   func(context.Context, *Chain[I, O], *I, *O, []components.LLMResponse)
 	errorHook func(context.Context, *Chain[I, O], *I, []components.LLMResponse, error)
 }
 
 // NewChain returns a new Chain instance
-func NewChain[I schema.Schema, O schema.Schema](agents ...ChainableAgent) *Chain[I, O] {
+func NewChain[I schema.Schema, O schema.Schema](agents ...AnonymousAgent) *Chain[I, O] {
 	return &Chain[I, O]{
 		agents: agents,
 	}
@@ -57,7 +57,7 @@ func (c *Chain[I, O]) Run(ctx context.Context, input *I, output *O) ([]component
 	)
 	for _, agent := range c.agents {
 		apiResp := new(components.LLMResponse)
-		if ret, err := agent.RunForChain(ctx, in, apiResp); err != nil {
+		if ret, err := agent.RunAnonymous(ctx, in, apiResp); err != nil {
 			if fn := c.errorHook; fn != nil {
 				fn(ctx, c, input, apiRespList, err)
 			}
@@ -84,7 +84,7 @@ func (c *Chain[I, O]) Run(ctx context.Context, input *I, output *O) ([]component
 }
 
 // Run runs the chat agents with the given user input synchronously.
-func (c *Chain[I, O]) RunForChain(ctx context.Context, input any, apiResp *components.LLMResponse) (any, error) {
+func (c *Chain[I, O]) RunAnonymous(ctx context.Context, input any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := input.(*I)
 	if !ok {
 		return nil, errors.New("invalid agent input schema")

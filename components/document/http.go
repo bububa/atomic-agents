@@ -59,6 +59,9 @@ func NewHttp(opts ...HttpOption) (*Http, error) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
+	if cfg.method == "" {
+		cfg.method = http.MethodGet
+	}
 	if cfg.client == nil {
 		cfg.client = http.DefaultClient
 	}
@@ -72,7 +75,7 @@ func NewHttp(opts ...HttpOption) (*Http, error) {
 		httpReq: httpReq,
 		Document: Document{
 			buffer: new(bytes.Buffer),
-			Meta: map[string]string{
+			meta: map[string]string{
 				"url":    cfg.link,
 				"method": cfg.method,
 			},

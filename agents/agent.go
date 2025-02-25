@@ -23,9 +23,24 @@ type IAgent interface {
 	Name() string
 }
 
-type ChainableAgent interface {
+type TypeableAgent[I schema.Schema, O schema.Schema] interface {
 	IAgent
-	RunForChain(context.Context, any, *components.LLMResponse) (any, error)
+	Run(context.Context, *I, *O, *components.LLMResponse) error
+}
+
+type StreamableAgent[I schema.Schema, O schema.Schema] interface {
+	IAgent
+	Stream(context.Context, *I) (<-chan string, MergeResponse, error)
+}
+
+type AnonymousAgent interface {
+	IAgent
+	RunAnonymous(context.Context, any, *components.LLMResponse) (any, error)
+}
+
+type AnonymousStreamableAgent interface {
+	AnonymousAgent
+	StreamAnonymous(context.Context, any) (<-chan string, MergeResponse, error)
 }
 
 type AgentSetter interface {
@@ -68,6 +83,13 @@ type Agent[I schema.Schema, O schema.Schema] struct {
 	endHook   func(context.Context, *Agent[I, O], *I, *O, *components.LLMResponse)
 	errorHook func(context.Context, *Agent[I, O], *I, *components.LLMResponse, error)
 }
+
+var (
+	_ TypeableAgent[schema.String, schema.String]   = (*Agent[schema.String, schema.String])(nil)
+	_ StreamableAgent[schema.String, schema.String] = (*Agent[schema.String, schema.String])(nil)
+	_ AnonymousAgent                                = (*Agent[schema.String, schema.String])(nil)
+	_ AnonymousStreamableAgent                      = (*Agent[schema.String, schema.String])(nil)
+)
 
 // NewAgent initializes the AgentAgent
 func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] {
@@ -525,7 +547,7 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 }
 
 // Run runs the chat agent with the given user input for chain.
-func (a *Agent[I, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
+func (a *Agent[I, O]) RunAnonymous(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := userInput.(*I)
 	if !ok {
 		return nil, errors.New("invalid input schema")
@@ -554,6 +576,18 @@ func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan string, 
 	}
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, nil, nil)
+	}
+	return ch, mergeResp, nil
+}
+
+func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-chan string, MergeResponse, error) {
+	in, ok := userInput.(*I)
+	if !ok {
+		return nil, nil, errors.New("invalid input schema")
+	}
+	ch, mergeResp, err := a.Stream(ctx, in)
+	if err != nil {
+		return nil, mergeResp, err
 	}
 	return ch, mergeResp, nil
 }

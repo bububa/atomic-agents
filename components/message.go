@@ -111,6 +111,14 @@ type LLMUsage struct {
 	OutputTokens int `json:"output_tokens,omitempty"`
 }
 
+func (u *LLMUsage) Merge(v *LLMUsage) {
+	if v == nil {
+		return
+	}
+	u.InputTokens += v.InputTokens
+	u.OutputTokens += v.OutputTokens
+}
+
 // Message  Represents a message in the chat history.
 //
 // Attributes:
