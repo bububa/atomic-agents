@@ -1,7 +1,6 @@
 package html
 
 import (
-	"bytes"
 	"context"
 	"io"
 
@@ -25,7 +24,7 @@ func NewParser(opts ...converter.ConvertOptionFunc) *Parser {
 }
 
 // Parse try to parse a html content from a bytes.Reader into a markdown content then write to an io.Writer
-func (h *Parser) Parse(ctx context.Context, reader *bytes.Reader, writer io.Writer) error {
+func (h *Parser) Parse(ctx context.Context, reader document.ParserReader, writer io.Writer) error {
 	bs, err := htmltomarkdown.ConvertReader(reader, h.opts...)
 	if err != nil {
 		return err

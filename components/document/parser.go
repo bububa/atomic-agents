@@ -1,7 +1,6 @@
 package document
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"strings"
@@ -9,7 +8,13 @@ import (
 )
 
 type Parser interface {
-	Parse(context.Context, *bytes.Reader, io.Writer) error
+	Parse(context.Context, ParserReader, io.Writer) error
+}
+
+type ParserReader interface {
+	io.Reader
+	io.ReaderAt
+	Size() int64
 }
 
 // EscapeMarkdown escapes special characters in a string for Markdown

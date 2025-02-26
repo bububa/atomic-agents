@@ -268,7 +268,7 @@ func (m Message) ToGemini(dist *gemini.Content) {
 	dist.Role = m.role
 	if dist.Role == FunctionRole {
 		bs := schema.ToBytes(m.content)
-		resp := make(map[string]interface{})
+		resp := make(map[string]any)
 		if err := json.Unmarshal(bs, &resp); err == nil {
 			dist.Parts = append(dist.Parts, gemini.FunctionResponse{
 				Response: resp,

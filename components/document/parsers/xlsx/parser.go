@@ -56,7 +56,7 @@ func (r CellRange) Insice(rowIdx int, cellIdx int) bool {
 }
 
 // Parse try to parse a pdf content from a bytes.Reader and write to an io.Writer
-func (p *Parser) Parse(ctx context.Context, reader *bytes.Reader, writer io.Writer) error {
+func (p *Parser) Parse(ctx context.Context, reader document.ParserReader, writer io.Writer) error {
 	opts := make([]excelize.Options, 0, 1)
 	if p.password != "" {
 		opts = append(opts, excelize.Options{Password: p.password})

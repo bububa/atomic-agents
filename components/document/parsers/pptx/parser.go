@@ -2,7 +2,6 @@ package pptx
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"io"
 	"regexp"
@@ -24,7 +23,7 @@ type Parser struct{}
 var _ document.Parser = (*Parser)(nil)
 
 // Parse try to parse a pdf content from a bytes.Reader and write to an io.Writer
-func (p *Parser) Parse(ctx context.Context, reader *bytes.Reader, writer io.Writer) error {
+func (p *Parser) Parse(ctx context.Context, reader document.ParserReader, writer io.Writer) error {
 	size := reader.Size()
 	pptx := NewPPTx()
 	zipReader, err := zip.NewReader(reader, size)

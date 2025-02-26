@@ -44,12 +44,12 @@ type AnonymousStreamableAgent interface {
 }
 
 type AgentSetter interface {
-	SetClient(clt instructor.Instructor)
-	SetMemory(m *components.Memory)
-	SetSystemPromptGenerator(g *systemprompt.Generator)
-	SetModel(model string)
-	SetTemperature(temperature float32)
-	SetMaxTokens(maxTokens int)
+	SetClient(instructor.Instructor)
+	SetMemory(components.MemoryStore)
+	SetSystemPromptGenerator(systemprompt.Generator)
+	SetModel(string)
+	SetTemperature(float32)
+	SetMaxTokens(int)
 }
 
 // Config represents general agents configuration
@@ -57,11 +57,11 @@ type Config struct {
 	// client Client for interacting with the language model
 	client instructor.Instructor
 	//	memory  Memory component for storing chat history.
-	memory *components.Memory
+	memory components.MemoryStore
 	//	systemPromptGenerator Component for generating system prompts.
 	systemPromptGenerator systemprompt.Generator
 	// initialMemory (AgentMemory): Initial state of the memory
-	initialMemory *components.Memory
+	initialMemory components.MemoryStore
 	// currentUserInput
 	// currentUserInput schema.Schema
 	// model llm model
@@ -89,6 +89,7 @@ var (
 	_ StreamableAgent[schema.String, schema.String] = (*Agent[schema.String, schema.String])(nil)
 	_ AnonymousAgent                                = (*Agent[schema.String, schema.String])(nil)
 	_ AnonymousStreamableAgent                      = (*Agent[schema.String, schema.String])(nil)
+	_ AgentSetter                                   = (*Agent[schema.String, schema.String])(nil)
 )
 
 // NewAgent initializes the AgentAgent
@@ -104,12 +105,17 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 		ret.systemPromptGenerator = cot.New()
 	}
 	ret.initialMemory = components.NewMemory(0)
-	ret.memory.Copy(ret.initialMemory)
+	ret.initialMemory.Copy(ret.memory)
 	return ret
 }
 
 // ResetMemory resets the memory to its initial state
 func (a *Agent[I, O]) ResetMemory() {
+	a.memory.Copy(a.initialMemory)
+}
+
+// ClearMemory resets the memory to its initial state
+func (a *Agent[I, O]) ClearMemory() {
 	a.memory.Reset()
 }
 
@@ -117,7 +123,7 @@ func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
 	a.client = clt
 }
 
-func (a *Agent[I, O]) SetMemory(m *components.Memory) {
+func (a *Agent[I, O]) SetMemory(m components.MemoryStore) {
 	a.memory = m
 }
 
