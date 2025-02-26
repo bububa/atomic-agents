@@ -100,11 +100,11 @@ func (r *RAG[O]) SetSearchOptions(opts ...vectordb.SearchOption) {
 	r.searchOptions = opts
 }
 
-func (r *RAG[O]) AddDocuments(ctx context.Context, collectionName string, docs ...document.IDocument) (*components.LLMUsage, error) {
+func (r *RAG[O]) AddDocuments(ctx context.Context, collectionName string, docs ...document.Document) (*components.LLMUsage, error) {
 	totalUsage := new(components.LLMUsage)
 	for _, doc := range docs {
 		var parts []string
-		content := doc.Content()
+		content := doc.String()
 		if r.chunker != nil {
 			chunks := r.chunker.Chunk(content)
 			parts = make([]string, 0, len(chunks))

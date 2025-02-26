@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -16,14 +15,11 @@ func TestHttpDocxParser(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := doc.ReadAll(); err != nil {
-		t.Error(err)
-	}
+	defer doc.Close()
 	ctx := context.Background()
-	w := new(bytes.Buffer)
 	parser := new(docx.Parser)
-	if err := parser.Parse(ctx, doc.Reader(), w); err != nil {
+	if err := parser.Parse(ctx, doc, doc); err != nil {
 		t.Error(err)
 	}
-	t.Log(w.String())
+	t.Log(doc.String())
 }
