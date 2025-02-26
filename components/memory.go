@@ -7,6 +7,17 @@ import (
 	"github.com/bububa/atomic-agents/schema"
 )
 
+type MemoryStore interface {
+	MaxMessages() int
+	TurnID() string
+	NewTurn() MemoryStore
+	NewMessage(MessageRole, schema.Schema) *Message
+	History() []Message
+	Reset() MemoryStore
+	Copy(MemoryStore)
+	MessageCount() int
+}
+
 // Memory Manages the chat history for an AI agent.
 // threadsafe
 type Memory struct {
@@ -20,6 +31,8 @@ type Memory struct {
 	// mtx sync lock
 	mtx *sync.RWMutex
 }
+
+var _ MemoryStore = (*Memory)(nil)
 
 // NewMemory initializes the Memory with an empty history and optional constraints.
 func NewMemory(maxMessages int) *Memory {
@@ -47,13 +60,13 @@ func (m Memory) TurnID() string {
 }
 
 // SetTurnID set the current turn ID
-func (m *Memory) SetTurnID(turnID string) *Memory {
+func (m *Memory) SetTurnID(turnID string) MemoryStore {
 	m.turnID = turnID
 	return m
 }
 
 // NewTurn initializes a new turn by generating a random turn ID.
-func (m *Memory) NewTurn() *Memory {
+func (m *Memory) NewTurn() MemoryStore {
 	return m.SetTurnID(NewTurnID())
 }
 
@@ -88,11 +101,12 @@ func (m *Memory) History() []Message {
 }
 
 // Copy creates a copy of the chat memory.
-func (m *Memory) Copy(dist *Memory) {
-	dist.SetMaxMessages(m.maxMessages).SetTurnID(m.turnID).SetHistory(m.History())
+func (m *Memory) Copy(src MemoryStore) {
+	m.SetMaxMessages(src.MaxMessages()).SetTurnID(src.TurnID())
+	m.SetHistory(src.History())
 }
 
-func (m *Memory) Reset() *Memory {
+func (m *Memory) Reset() MemoryStore {
 	m.mtx.Lock()
 	m.history = make([]Message, 0, m.maxMessages)
 	m.mtx.Unlock()

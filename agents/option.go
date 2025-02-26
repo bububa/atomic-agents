@@ -15,7 +15,7 @@ func WithClient(clt instructor.Instructor) Option {
 	}
 }
 
-func WithMemory(m *components.Memory) Option {
+func WithMemory(m components.MemoryStore) Option {
 	return func(a *Config) {
 		a.memory = m
 	}
