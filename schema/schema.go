@@ -11,6 +11,8 @@ import (
 type Schema interface {
 	// Attachement() returns schema attchement
 	Attachement() *Attachement
+	// Chunks() returns additional schema chunks
+	Chunks() []Schema
 }
 
 type SchemaPointer interface {
