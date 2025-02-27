@@ -106,11 +106,7 @@ func (r *RAG[O]) AddDocuments(ctx context.Context, collectionName string, docs .
 		var parts []string
 		content := doc.String()
 		if r.chunker != nil {
-			chunks := r.chunker.Chunk(content)
-			parts = make([]string, 0, len(chunks))
-			for _, chunk := range chunks {
-				parts = append(parts, chunk.Text)
-			}
+			parts = r.chunker.SplitText(content)
 		} else {
 			parts = []string{content}
 		}

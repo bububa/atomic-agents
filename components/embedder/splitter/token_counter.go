@@ -1,8 +1,12 @@
-package embedder
+package splitter
 
 import (
 	"fmt"
-	"strings"
+
+	"github.com/clipperhouse/uax29/graphemes"
+	"github.com/clipperhouse/uax29/phrases"
+	"github.com/clipperhouse/uax29/sentences"
+	"github.com/clipperhouse/uax29/words"
 
 	"github.com/pkoukk/tiktoken-go"
 )
@@ -12,18 +16,31 @@ import (
 type TokenCounter interface {
 	// Count returns the number of tokens in the given text according to the
 	// implementation's tokenization strategy.
-	Count(text string) int
+	Count(p []byte) int
 }
 
-// DefaultTokenCounter provides a simple word-based token counting implementation.
-// It splits text on whitespace to approximate token counts. This is suitable
-// for basic use cases but may not accurately reflect subword tokenization
-// used by language models.
-type DefaultTokenCounter struct{}
+type GraphemesTokenCounter struct{}
 
-// Count returns the number of words in the text, using whitespace as a delimiter.
-func (dtc *DefaultTokenCounter) Count(text string) int {
-	return len(strings.Fields(text))
+func (c *GraphemesTokenCounter) Count(p []byte) int {
+	return len(graphemes.SegmentAll(p))
+}
+
+type WordsTokenCounter struct{}
+
+func (c WordsTokenCounter) Count(p []byte) int {
+	return len(words.SegmentAll(p))
+}
+
+type PhraseTokenCounter struct{}
+
+func (c PhraseTokenCounter) Count(p []byte) int {
+	return len(phrases.SegmentAll(p))
+}
+
+type SentencesTokenCounter struct{}
+
+func (c SentencesTokenCounter) Count(p []byte) int {
+	return len(sentences.SegmentAll(p))
 }
 
 // TikTokenCounter provides accurate token counting using the tiktoken library,
@@ -47,6 +64,6 @@ func NewTikTokenCounter(encoding string) (*TikTokenCounter, error) {
 
 // Count returns the exact number of tokens in the text according to the
 // specified tiktoken encoding.
-func (ttc *TikTokenCounter) Count(text string) int {
-	return len(ttc.tke.Encode(text, nil, nil))
+func (ttc *TikTokenCounter) Count(p []byte) int {
+	return len(ttc.tke.Encode(string(p), nil, nil))
 }
