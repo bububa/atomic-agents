@@ -1,6 +1,7 @@
 package embedder
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -9,7 +10,31 @@ import (
 	"math"
 
 	"github.com/bububa/atomic-agents/components"
+	"github.com/google/uuid"
 )
+
+// Embedding is a special format of data representation that can be easily utilized by machine
+// learning models and algorithms. The embedding is an information dense representation of the
+// semantic meaning of a piece of text. Each embedding is a vector of floating point numbers,
+// such that the distance between two embeddings in the vector space is correlated with semantic similarity
+// between two inputs in the original format. For example, if two texts are similar,
+// then their vector representations should also be similar.
+type Embedding struct {
+	Object    string            `json:"object"`
+	Embedding []float64         `json:"embedding"`
+	Index     int               `json:"index"`
+	Meta      map[string]string `json:"meta,omitempty"`
+}
+
+func (e Embedding) UUID() string {
+	sb := new(bytes.Buffer)
+	sb.WriteString(e.Object)
+	for k, v := range e.Meta {
+		sb.WriteString(k + ":" + v)
+		sb.WriteByte('\n')
+	}
+	return uuid.NewSHA1(uuid.NameSpaceOID, sb.Bytes()).String()
+}
 
 type Embedder interface {
 	Provider() Provider
@@ -28,26 +53,20 @@ type Embedder interface {
 // 4. Provides progress information via debug output
 //
 // Returns an error if any chunk fails to embed properly.
-func EmbedChunks(ctx context.Context, embedder Embedder, chunks []Chunk, usage *components.LLMUsage) ([]EmbeddedChunk, error) {
+func EmbedChunks(ctx context.Context, embedder Embedder, chunks []Embedding, usage *components.LLMUsage) error {
 	parts := make([]string, 0, len(chunks))
 	for _, chunk := range chunks {
-		parts = append(parts, chunk.Text)
+		parts = append(parts, chunk.Object)
 	}
 
 	ret, err := embedder.BatchEmbed(ctx, parts, usage)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	embeddedChunks := make([]EmbeddedChunk, 0, len(ret))
-	for _, v := range ret {
-
-		embeddedChunk := EmbeddedChunk{
-			Embedding: v,
-			Chunk:     &chunks[v.Index],
-		}
-		embeddedChunks = append(embeddedChunks, embeddedChunk)
+	for idx, v := range ret {
+		chunks[idx].Embedding = v.Embedding
 	}
-	return embeddedChunks, nil
+	return nil
 }
 
 // EmbedChunk processes text chunk and generates embeddings.
@@ -57,8 +76,8 @@ func EmbedChunks(ctx context.Context, embedder Embedder, chunks []Chunk, usage *
 // 2. Processes each chunk through the embedder
 // 3. Creates EmbeddedChunk instances with the results
 // 4. Provides progress information via debug output
-func EmbedChunk(ctx context.Context, embedder Embedder, chunk *Chunk, embedding *Embedding, usage *components.LLMUsage) error {
-	return embedder.Embed(ctx, chunk.Text, embedding, usage)
+func EmbedChunk(ctx context.Context, embedder Embedder, embedding *Embedding, usage *components.LLMUsage) error {
+	return embedder.Embed(ctx, embedding.Object, embedding, usage)
 }
 
 // Base64 is base64 encoded embedding string.
