@@ -24,7 +24,7 @@ func TestWords(t *testing.T) {
 				"one two three",
 				"four five six",
 				"seven eight nine",
-				"ten.",
+				"ten .",
 			},
 		},
 		{
@@ -37,7 +37,7 @@ func TestWords(t *testing.T) {
 				"three four five",
 				"five six seven",
 				"seven eight nine",
-				"nine ten.",
+				"nine ten .",
 			},
 		},
 	}

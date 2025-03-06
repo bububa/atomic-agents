@@ -112,16 +112,10 @@ func (o *Options) Scan() error {
 		partTokenCount := o.tokenCounter.Count(part)
 		if currentTokenCount+partTokenCount > o.chunkSize && currentTokenCount > 0 {
 			overlapStart := max(currentChunk.Start, currentChunk.End-o.estimateOverlapParts(parts, currentChunk.End, o.overlap))
-			if len(o.delimiter) > 0 {
-				if l := currentChunk.Buffer.Len(); l > 0 {
-					currentChunk.Buffer.Truncate(l - 1)
-				}
-			}
 			if _, err := currentChunk.Buffer.WriteTo(o); err != nil {
 				return err
 			}
-			currentChunk.Buffer.Write(bytes.Join(parts[overlapStart:i+1], o.delimiter))
-			currentChunk.Buffer.Write(o.delimiter)
+			o.joinPartsWithoutDelimiter(currentChunk.Buffer, parts[overlapStart:i+1])
 			currentChunk.TokenSize = 0
 			currentChunk.Start = overlapStart
 			currentChunk.End = i + 1
@@ -133,23 +127,23 @@ func (o *Options) Scan() error {
 			if currentTokenCount == 0 {
 				currentChunk.Start = i
 			}
-			if currentChunk.Buffer == nil {
-				currentChunk.Buffer = bytes.NewBuffer(part)
-			} else {
-				currentChunk.Buffer.Write(part)
+			if !bytes.Equal(part, o.delimiter) {
+				if i > 0 {
+					currentChunk.Buffer.Write(o.delimiter)
+				}
+				part = bytes.TrimSuffix(part, o.delimiter)
+				if currentChunk.Buffer == nil {
+					currentChunk.Buffer = bytes.NewBuffer(part)
+				} else {
+					currentChunk.Buffer.Write(part)
+				}
 			}
-			currentChunk.Buffer.Write(o.delimiter)
 			currentChunk.End = i + 1
 			currentTokenCount = o.tokenCounter.Count(currentChunk.Buffer.Bytes())
 		}
 		currentChunk.TokenSize = currentTokenCount
 	}
 	if currentChunk.TokenSize > 0 {
-		if len(o.delimiter) > 0 {
-			if l := currentChunk.Buffer.Len(); l > 0 {
-				currentChunk.Buffer.Truncate(l - 1)
-			}
-		}
 		if _, err := currentChunk.Buffer.WriteTo(o); err != nil {
 			return err
 		}
@@ -169,6 +163,19 @@ func (o *Options) SplitText(txt string) []string {
 		return nil
 	}
 	return o.Chunks()
+}
+
+func (o *Options) joinPartsWithoutDelimiter(w io.Writer, parts [][]byte) {
+	for idx, part := range parts {
+		part = bytes.Trim(part, string(o.delimiter))
+		if len(part) == 0 {
+			continue
+		}
+		if idx > 0 {
+			w.Write(o.delimiter)
+		}
+		w.Write(part)
+	}
 }
 
 // estimateOverlapParts calculates how many parts from the end of the
