@@ -2,14 +2,11 @@ package splitter
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/clipperhouse/uax29/sentences"
 )
 
-func TestSentences(t *testing.T) {
+func TestPhrases(t *testing.T) {
 	tests := []struct {
 		name       string
 		input      string
@@ -19,39 +16,24 @@ func TestSentences(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:      "basic chunking one",
-			input:     "Basic chunking one. Chunking two? Chunking three!",
-			chunkSize: 1,
-			overlap:   0,
-			wantChunks: []string{
-				"Basic chunking one.",
-				"Chunking two?",
-				"Chunking three!",
-			},
-		},
-		{
-			name:       "basic chunking one 2",
-			input:      "Basic chunking one. Chunking two? Chunking three!",
-			chunkSize:  9,
+			name:       "basic chunking",
+			input:      "Hello, 世界. Nice — and totally adorable — dog; perhaps the “best one”! 🏆 🐶",
+			chunkSize:  3,
 			overlap:    0,
-			wantChunks: []string{"Basic chunking one. Chunking two?", "Chunking three!"},
+			wantChunks: []string{"Hello , 世", "界 . Nice", "— and totally", "adorable — dog", "; perhaps the", "“ best one", "” ! 🏆", "🐶"},
 		},
 		{
 			name:       "with overlap",
-			input:      "Basic chunking one. Chunking two? Chunking three!",
-			chunkSize:  4,
+			input:      "Hello, 世界. Nice — and totally adorable — dog; perhaps the “best one”! 🏆 🐶",
+			chunkSize:  3,
 			overlap:    1,
-			wantChunks: []string{"Basic chunking one.", "Basic chunking one. Chunking two?", "Chunking two? Chunking three!"},
+			wantChunks: []string{"Hello , 世", "世 界 .", ". Nice —", "— and totally", "totally adorable —", "— dog ;", "; perhaps the", "the “ best", "best one ”", "” ! 🏆", "🏆 🐶"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segmenter := sentences.NewSegmenter([]byte(tt.input))
-			for segmenter.Next() {
-				fmt.Println(segmenter.Text())
-			}
-			splitter := NewSentences(
+			splitter := NewWords(
 				WithChunkSize(tt.chunkSize),
 				WithOverlap(tt.overlap),
 				WithBuffer(bytes.NewBuffer([]byte(tt.input))),

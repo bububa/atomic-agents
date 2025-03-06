@@ -46,7 +46,7 @@ func TestGraphemes(t *testing.T) {
 			chunkSize:    3,
 			overlap:      2,
 			tokenCounter: "field",
-			wantChunks:   []string{"hello world, a", ", ax", "axx", "xxx", "xxx bxxx c", "x cx", "cxx", "xxx"},
+			wantChunks:   []string{"hello world, ", "d, a", ", ax", "axx", "xxx", "xxx bxxx c", "x cx", "cxx", "xxx"},
 		},
 	}
 

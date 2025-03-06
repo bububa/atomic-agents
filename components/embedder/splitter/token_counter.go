@@ -1,6 +1,7 @@
 package splitter
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/clipperhouse/uax29/graphemes"
@@ -28,19 +29,43 @@ func (c *GraphemesTokenCounter) Count(p []byte) int {
 type WordsTokenCounter struct{}
 
 func (c WordsTokenCounter) Count(p []byte) int {
-	return len(words.SegmentAll(p))
+	list := words.SegmentAll(bytes.TrimSpace(p))
+	var count int
+	for _, v := range list {
+		if string(v) == " " {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
-type PhraseTokenCounter struct{}
+type PhrasesTokenCounter struct{}
 
-func (c PhraseTokenCounter) Count(p []byte) int {
-	return len(phrases.SegmentAll(p))
+func (c PhrasesTokenCounter) Count(p []byte) int {
+	list := phrases.SegmentAll(bytes.TrimSpace(p))
+	var count int
+	for _, v := range list {
+		if string(v) == " " {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 type SentencesTokenCounter struct{}
 
 func (c SentencesTokenCounter) Count(p []byte) int {
-	return len(sentences.SegmentAll(p))
+	list := sentences.SegmentAll(bytes.TrimSpace(p))
+	var count int
+	for _, v := range list {
+		if string(v) == " " {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 // TikTokenCounter provides accurate token counting using the tiktoken library,
