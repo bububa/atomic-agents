@@ -2,8 +2,6 @@ package vectordb
 
 import (
 	"context"
-
-	"github.com/bububa/atomic-agents/components/embedder"
 )
 
 type EngineType string
@@ -15,6 +13,6 @@ const (
 )
 
 type Engine interface {
-	Insert(context.Context, []embedder.Embedding) error
+	Insert(context.Context, string, ...Record) error
 	Search(context.Context, []float64, ...SearchOption) ([]Record, error)
 }

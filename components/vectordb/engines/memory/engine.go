@@ -20,6 +20,8 @@ type Engine struct {
 	vectordb.Options
 }
 
+var _ vectordb.Engine = (*Engine)(nil)
+
 // Collection represents a named set of records with a defined schema.
 // It's the basic unit of organization in the memory database.
 type Collection struct {
@@ -70,13 +72,13 @@ func (m *Engine) DropCollection(name string) error {
 // Collection creates a new collection with the specified schema.
 // Returns an error if a collection with the same name already exists.
 // This operation is thread-safe and uses a write lock.
-func (e *Engine) Collection(name string) (*Collection, error) {
+func (e *Engine) Collection(_ context.Context, name string) (*Collection, error) {
 	col, _ := e.collections.LoadOrStore(name, new(Collection))
 	return col.(*Collection), nil
 }
 
-func (e *Engine) Insert(ctx context.Context, collectionName string, records []vectordb.Record) error {
-	col, err := e.Collection(collectionName)
+func (e *Engine) Insert(ctx context.Context, collectionName string, records ...vectordb.Record) error {
+	col, err := e.Collection(ctx, collectionName)
 	if err != nil {
 		return err
 	}
@@ -97,13 +99,13 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 	for _, opt := range opts {
 		opt(&option)
 	}
-	col, err := e.Collection(option.Collection)
+	col, err := e.Collection(ctx, option.Collection)
 	if err != nil {
 		return nil, err
 	}
 	records := filterRecords(col.Records(), &option)
-	for _, record := range records {
-		record.Score = calculateDistance(vectors, record.Embedding.Embedding)
+	for idx, record := range records {
+		records[idx].Score = calculateDistance(vectors, record.Embedding.Embedding)
 	}
 	sort.Slice(records, func(i, j int) bool {
 		return records[i].Score < records[j].Score

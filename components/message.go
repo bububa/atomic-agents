@@ -111,6 +111,14 @@ type LLMUsage struct {
 	OutputTokens int `json:"output_tokens,omitempty"`
 }
 
+func (u *LLMUsage) Merge(v *LLMUsage) {
+	if v == nil {
+		return
+	}
+	u.InputTokens += v.InputTokens
+	u.OutputTokens += v.OutputTokens
+}
+
 // Message  Represents a message in the chat history.
 //
 // Attributes:
@@ -149,9 +157,41 @@ func (m Message) Content() schema.Schema {
 	return m.content
 }
 
-// attachement returns message attachement
+// Attachement returns message attachement
 func (m Message) Attachement() *schema.Attachement {
 	return m.content.Attachement()
+}
+
+// FileIDs returns message attachement file ids
+func (m Message) FileIDs() []string {
+	attachment := m.content.Attachement()
+	if attachment == nil {
+		return nil
+	}
+	return attachment.FileIDs
+}
+
+// ImageURLs returns message attachement image urls
+func (m Message) ImageURLs() []string {
+	attachment := m.content.Attachement()
+	if attachment == nil {
+		return nil
+	}
+	return attachment.ImageURLs
+}
+
+// Files returns message attachement files
+func (m Message) Files() []io.Reader {
+	attachment := m.content.Attachement()
+	if attachment == nil {
+		return nil
+	}
+	return attachment.Files
+}
+
+// Chunks returns message attachement chunks
+func (m Message) Chunks() []schema.Schema {
+	return m.content.Chunks()
 }
 
 // turnID returns message turnID
@@ -159,16 +199,61 @@ func (m Message) TurnID() string {
 	return m.turnID
 }
 
-// ToOpenAI convert message to openai ChatCompletionMessage
-func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
-	dist.Role = m.role
+func (m Message) TryAttachChunkPrompt(idx int) string {
 	var txt string
-	if v, ok := m.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(m.content)
+	if idx == 0 {
+		if v, ok := m.content.(schema.Markdownable); ok {
+			txt = v.ToMarkdown()
+		} else {
+			txt = schema.Stringify(m.content)
+		}
 	}
-	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
+	if l := len(m.Chunks()); l > 0 {
+		if idx < l {
+			return fmt.Sprintf(`Do not answer yet. This is just another part of the text I want to send you. Just receive and acknowledge as "Part %[1]d/%[2]d received" and wait for the next part.
+        [START PART %[1]d/%[2]d]
+        %[3]s
+        [END PART %[1]d/%[2]d]
+        Remember not answering yet. Just acknowledge you received this part with the message "Part %[1]d/%[2]d received" and wait for the next part.`, idx+1, l, txt)
+		} else {
+			return fmt.Sprintf(`[START PART %[1]d/%[2]d]
+        %[3]s
+        [END PART %[1]d/%[2]d]
+        ALL PARTS SENT. Now you can continue processing the request.`, idx+1, l, txt)
+		}
+	}
+	return txt
+}
+
+// ToOpenAI convert message to openai ChatCompletionMessage
+func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) []openai.ChatCompletionMessage {
+	m.toOpenAI(dist, 0)
+	if l := len(m.Chunks()); l > 0 {
+		list := make([]openai.ChatCompletionMessage, 0, l)
+		for idx := range l {
+			var llmMsg openai.ChatCompletionMessage
+			if err := m.toOpenAI(&llmMsg, idx+1); err == nil {
+				list = append(list, llmMsg)
+			}
+		}
+		return list
+	}
+	return nil
+}
+
+func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
+	src := m
+	chunks := m.Chunks()
+	if idx > 0 {
+		if len(chunks) > idx {
+			src = Message{content: chunks[idx], role: m.role}
+		} else {
+			return errors.New("invalid chunk index")
+		}
+	}
+	dist.Role = m.role
+	txt := m.TryAttachChunkPrompt(idx)
+	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
 			Type: openai.ChatMessagePartTypeText,
@@ -185,18 +270,38 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) {
 	} else {
 		dist.Content = txt
 	}
+	return nil
 }
 
 // ToAnthropic convert message to anthropic Message
-func (m Message) ToAnthropic(dist *anthropic.Message) {
-	dist.Role = anthropic.ChatRole(m.role)
-	var txt string
-	if v, ok := m.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(m.content)
+func (m Message) ToAnthropic(dist *anthropic.Message) []anthropic.Message {
+	m.toAnthropic(dist, 0)
+	if l := len(m.Chunks()); l > 0 {
+		list := make([]anthropic.Message, 0, l)
+		for idx := range l {
+			var llmMsg anthropic.Message
+			if err := m.toAnthropic(&llmMsg, idx+1); err == nil {
+				list = append(list, llmMsg)
+			}
+		}
+		return list
 	}
-	if attachement := m.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
+	return nil
+}
+
+func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
+	src := m
+	chunks := m.Chunks()
+	if idx > 0 {
+		if len(chunks) > idx {
+			src = Message{content: chunks[idx], role: m.role}
+		} else {
+			return errors.New("invalid chunk index")
+		}
+	}
+	dist.Role = anthropic.ChatRole(m.role)
+	txt := m.TryAttachChunkPrompt(idx)
+	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
 		images := getImages(attachement.ImageURLs)
 		dist.Content = make([]anthropic.MessageContent, 0, len(images)+len(attachement.Files)+1)
 		buf := new(bytes.Buffer)
@@ -225,17 +330,32 @@ func (m Message) ToAnthropic(dist *anthropic.Message) {
 		}
 	}
 	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(txt)}
+	return nil
 }
 
 // ToCohere convert message to cohere Message
-func (m Message) ToCohere(dist *cohere.Message) {
-	dist.Role = m.role
-	var txt string
-	if v, ok := m.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(m.content)
+func (m Message) ToCohere(dist *cohere.Message) []*cohere.Message {
+	m.toCohere(dist, 0)
+	if l := len(m.Chunks()); l > 0 {
+		list := make([]*cohere.Message, 0, l)
+		for idx := range l {
+			var llmMsg cohere.Message
+			if err := m.toCohere(&llmMsg, idx+1); err == nil {
+				list = append(list, &llmMsg)
+			}
+		}
+		return list
 	}
+	return nil
+}
+
+func (m Message) toCohere(dist *cohere.Message, idx int) error {
+	chunks := m.Chunks()
+	if idx > 0 && len(chunks) <= idx {
+		return errors.New("invalid chunk index")
+	}
+	dist.Role = m.role
+	txt := m.TryAttachChunkPrompt(idx)
 	switch m.role {
 	case SystemRole:
 		dist.Role = "SYSTEM"
@@ -253,29 +373,49 @@ func (m Message) ToCohere(dist *cohere.Message) {
 			Message: txt,
 		}
 	}
+	return nil
 }
 
 // ToGemini convert message to openai Content
-func (m Message) ToGemini(dist *gemini.Content) {
+func (m Message) ToGemini(dist *gemini.Content) []*gemini.Content {
+	m.toGemini(dist, 0)
+	if l := len(m.Chunks()); l > 0 {
+		list := make([]*gemini.Content, 0, l)
+		for idx := range l {
+			var llmMsg gemini.Content
+			if err := m.toGemini(&llmMsg, idx+1); err == nil {
+				list = append(list, &llmMsg)
+			}
+		}
+		return list
+	}
+	return nil
+}
+
+func (m Message) toGemini(dist *gemini.Content, idx int) error {
+	src := m
+	chunks := m.Chunks()
+	if idx > 0 {
+		if len(chunks) > idx {
+			src = Message{content: chunks[idx], role: m.role}
+		} else {
+			return errors.New("invalid chunk index")
+		}
+	}
 	dist.Role = m.role
 	if dist.Role == FunctionRole {
 		bs := schema.ToBytes(m.content)
-		resp := make(map[string]interface{})
+		resp := make(map[string]any)
 		if err := json.Unmarshal(bs, &resp); err == nil {
 			dist.Parts = append(dist.Parts, gemini.FunctionResponse{
 				Response: resp,
 			})
-			return
+			return nil
 		}
 	}
-	var txt string
-	if v, ok := m.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(m.content)
-	}
+	txt := m.TryAttachChunkPrompt(idx)
 	dist.Parts = append(dist.Parts, gemini.Text(txt))
-	if attachement := m.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
+	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		images := getImages(attachement.ImageURLs)
 		dist.Parts = make([]gemini.Part, 0, len(images)+1)
 		buf := new(bytes.Buffer)
@@ -287,6 +427,7 @@ func (m Message) ToGemini(dist *gemini.Content) {
 			dist.Parts = append(dist.Parts, gemini.ImageData("jpeg", bs))
 		}
 	}
+	return nil
 }
 
 func getImages(urls []string) []image.Image {
@@ -326,18 +467,18 @@ func getImage(imgURL string) (image.Image, error) {
 	return img, nil
 }
 
-func getImageData(imgURL string) ([]byte, error) {
-	if strings.HasPrefix(imgURL, "data") && strings.Contains(imgURL, ";base64,") {
-		parts := strings.Split(imgURL, ",")
-		if len(parts) != 2 {
-			return nil, errors.New("invalid image url")
-		}
-		return base64.StdEncoding.DecodeString(strings.TrimSpace(parts[1]))
-	}
-	resp, err := http.Get(imgURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
-}
+// func getImageData(imgURL string) ([]byte, error) {
+// 	if strings.HasPrefix(imgURL, "data") && strings.Contains(imgURL, ";base64,") {
+// 		parts := strings.Split(imgURL, ",")
+// 		if len(parts) != 2 {
+// 			return nil, errors.New("invalid image url")
+// 		}
+// 		return base64.StdEncoding.DecodeString(strings.TrimSpace(parts[1]))
+// 	}
+// 	resp, err := http.Get(imgURL)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer resp.Body.Close()
+// 	return io.ReadAll(resp.Body)
+// }

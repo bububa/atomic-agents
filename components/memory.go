@@ -7,6 +7,18 @@ import (
 	"github.com/bububa/atomic-agents/schema"
 )
 
+type MemoryStore interface {
+	MaxMessages() int
+	TurnID() string
+	NewTurn() MemoryStore
+	NewMessage(MessageRole, schema.Schema) *Message
+	AddMessage(msg *Message)
+	History() []Message
+	Reset() MemoryStore
+	Copy(MemoryStore)
+	MessageCount() int
+}
+
 // Memory Manages the chat history for an AI agent.
 // threadsafe
 type Memory struct {
@@ -20,6 +32,8 @@ type Memory struct {
 	// mtx sync lock
 	mtx *sync.RWMutex
 }
+
+var _ MemoryStore = (*Memory)(nil)
 
 // NewMemory initializes the Memory with an empty history and optional constraints.
 func NewMemory(maxMessages int) *Memory {
@@ -47,19 +61,24 @@ func (m Memory) TurnID() string {
 }
 
 // SetTurnID set the current turn ID
-func (m *Memory) SetTurnID(turnID string) *Memory {
+func (m *Memory) SetTurnID(turnID string) MemoryStore {
 	m.turnID = turnID
 	return m
 }
 
 // NewTurn initializes a new turn by generating a random turn ID.
-func (m *Memory) NewTurn() *Memory {
+func (m *Memory) NewTurn() MemoryStore {
 	return m.SetTurnID(NewTurnID())
 }
 
 // NewMessage adds a message to the chat history and manages overflow.
 func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
 	msg := NewMessage(role, content).SetTurnID(m.turnID)
+	m.AddMessage(msg)
+	return msg
+}
+
+func (m *Memory) AddMessage(msg *Message) {
 	m.mtx.Lock()
 	// Manages the chat history overflow based on max_messages constraint.
 	m.history = append(m.history, *msg)
@@ -68,7 +87,6 @@ func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
 		m.history = m.history[1:]
 	}
 	m.mtx.Unlock()
-	return msg
 }
 
 // SetHistory set a copy of chat history
@@ -88,11 +106,12 @@ func (m *Memory) History() []Message {
 }
 
 // Copy creates a copy of the chat memory.
-func (m *Memory) Copy(dist *Memory) {
-	dist.SetMaxMessages(m.maxMessages).SetTurnID(m.turnID).SetHistory(m.History())
+func (m *Memory) Copy(src MemoryStore) {
+	m.SetMaxMessages(src.MaxMessages()).SetTurnID(src.TurnID())
+	m.SetHistory(src.History())
 }
 
-func (m *Memory) Reset() *Memory {
+func (m *Memory) Reset() MemoryStore {
 	m.mtx.Lock()
 	m.history = make([]Message, 0, m.maxMessages)
 	m.mtx.Unlock()

@@ -10,3 +10,11 @@ func Float32s(v []float64) []float32 {
 	}
 	return result
 }
+
+func Float64s(v []float32) []float64 {
+	result := make([]float64, len(v))
+	for i, val := range v {
+		result[i] = float64(val)
+	}
+	return result
+}

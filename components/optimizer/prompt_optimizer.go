@@ -123,12 +123,12 @@ func (po *PromptOptimizer[I]) OptimizePrompt(ctx context.Context, prompt *I) (*I
 	var bestPrompt *I
 	var bestScore float64
 
-	for i := 0; i < po.iterations; i++ {
+	for i := range po.iterations {
 		var entry OptimizationEntry
 		var err error
 
 		// Retry loop for assessment
-		for attempt := 0; attempt < po.maxRetries; attempt++ {
+		for attempt := range po.maxRetries {
 			if err = po.assessPrompt(ctx, currentPrompt, &entry.Assessment); err == nil {
 				break
 			}

@@ -23,18 +23,33 @@ type IAgent interface {
 	Name() string
 }
 
-type ChainableAgent interface {
+type TypeableAgent[I schema.Schema, O schema.Schema] interface {
 	IAgent
-	RunForChain(context.Context, any, *components.LLMResponse) (any, error)
+	Run(context.Context, *I, *O, *components.LLMResponse) error
+}
+
+type StreamableAgent[I schema.Schema, O schema.Schema] interface {
+	IAgent
+	Stream(context.Context, *I) (<-chan string, MergeResponse, error)
+}
+
+type AnonymousAgent interface {
+	IAgent
+	RunAnonymous(context.Context, any, *components.LLMResponse) (any, error)
+}
+
+type AnonymousStreamableAgent interface {
+	AnonymousAgent
+	StreamAnonymous(context.Context, any) (<-chan string, MergeResponse, error)
 }
 
 type AgentSetter interface {
-	SetClient(clt instructor.Instructor)
-	SetMemory(m *components.Memory)
-	SetSystemPromptGenerator(g *systemprompt.Generator)
-	SetModel(model string)
-	SetTemperature(temperature float32)
-	SetMaxTokens(maxTokens int)
+	SetClient(instructor.Instructor)
+	SetMemory(components.MemoryStore)
+	SetSystemPromptGenerator(systemprompt.Generator)
+	SetModel(string)
+	SetTemperature(float32)
+	SetMaxTokens(int)
 }
 
 // Config represents general agents configuration
@@ -42,11 +57,11 @@ type Config struct {
 	// client Client for interacting with the language model
 	client instructor.Instructor
 	//	memory  Memory component for storing chat history.
-	memory *components.Memory
+	memory components.MemoryStore
 	//	systemPromptGenerator Component for generating system prompts.
 	systemPromptGenerator systemprompt.Generator
 	// initialMemory (AgentMemory): Initial state of the memory
-	initialMemory *components.Memory
+	initialMemory components.MemoryStore
 	// currentUserInput
 	// currentUserInput schema.Schema
 	// model llm model
@@ -69,6 +84,14 @@ type Agent[I schema.Schema, O schema.Schema] struct {
 	errorHook func(context.Context, *Agent[I, O], *I, *components.LLMResponse, error)
 }
 
+var (
+	_ TypeableAgent[schema.String, schema.String]   = (*Agent[schema.String, schema.String])(nil)
+	_ StreamableAgent[schema.String, schema.String] = (*Agent[schema.String, schema.String])(nil)
+	_ AnonymousAgent                                = (*Agent[schema.String, schema.String])(nil)
+	_ AnonymousStreamableAgent                      = (*Agent[schema.String, schema.String])(nil)
+	_ AgentSetter                                   = (*Agent[schema.String, schema.String])(nil)
+)
+
 // NewAgent initializes the AgentAgent
 func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] {
 	ret := new(Agent[I, O])
@@ -82,20 +105,34 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 		ret.systemPromptGenerator = cot.New()
 	}
 	ret.initialMemory = components.NewMemory(0)
-	ret.memory.Copy(ret.initialMemory)
+	ret.initialMemory.Copy(ret.memory)
 	return ret
 }
 
 // ResetMemory resets the memory to its initial state
 func (a *Agent[I, O]) ResetMemory() {
+	a.memory.Copy(a.initialMemory)
+}
+
+// ClearMemory resets the memory to its initial state
+func (a *Agent[I, O]) ClearMemory() {
 	a.memory.Reset()
+}
+
+func (a *Agent[I, O]) Memory() components.MemoryStore {
+	return a.memory
+}
+
+// AddToMemory add message to memory
+func (a *Agent[I, O]) AddToMemory(msg *components.Message) {
+	a.memory.AddMessage(msg)
 }
 
 func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
 	a.client = clt
 }
 
-func (a *Agent[I, O]) SetMemory(m *components.Memory) {
+func (a *Agent[I, O]) SetMemory(m components.MemoryStore) {
 	a.memory = m
 }
 
@@ -159,8 +196,11 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 		for _, msg := range messages {
 			v := new(openai.ChatCompletionMessage)
-			msg.ToOpenAI(v)
+			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		res := new(openai.ChatCompletionResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -176,8 +216,11 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 		for _, msg := range messages {
 			v := new(anthropic.Message)
-			msg.ToAnthropic(v)
+			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		res := new(anthropic.MessagesResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -199,8 +242,11 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 				break
 			}
 			v := new(cohere.Message)
-			msg.ToCohere(v)
+			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+			if len(chunks) > 0 {
+				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
+			}
 		}
 		res := new(cohere.NonStreamedChatResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -217,17 +263,28 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			sysMsg.ToGemini(v)
 			chatReq.System = v
 		}
-		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			userMsg.ToGemini(v)
-			chatReq.Parts = append(chatReq.Parts, v.Parts...)
-		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
 			v := new(geminiAPI.Content)
-			msg.ToGemini(v)
+			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
+			if len(chunks) > 0 {
+				chatReq.History = append(chatReq.History, chunks...)
+			}
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			chunks := userMsg.ToGemini(v)
+			if l := len(chunks); l > 0 {
+				chatReq.History = append(chatReq.History, v)
+				if l > 1 {
+					chatReq.History = append(chatReq.History, chunks[:l-1]...)
+				}
+				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
+			} else {
+				chatReq.Parts = append(chatReq.Parts, v.Parts...)
+			}
 		}
 		res := new(geminiAPI.GenerateContentResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -273,8 +330,11 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		}
 		for _, msg := range messages {
 			v := new(openai.ChatCompletionMessage)
-			msg.ToOpenAI(v)
+			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		ch, err := clt.Stream(ctx, &chatReq, llmResp)
 		if err != nil {
@@ -296,8 +356,11 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 		}
 		for _, msg := range messages {
 			v := new(anthropic.Message)
-			msg.ToAnthropic(v)
+			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		ch, err := clt.Stream(ctx, &chatReq, llmResp)
 		if err != nil {
@@ -325,8 +388,11 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 				break
 			}
 			v := new(cohere.Message)
-			msg.ToCohere(v)
+			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+			if len(chunks) > 0 {
+				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
+			}
 		}
 		ch, err := clt.Stream(ctx, &chatReq, llmResp)
 		if err != nil {
@@ -350,17 +416,28 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 			sysMsg.ToGemini(v)
 			chatReq.System = v
 		}
-		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			userMsg.ToGemini(v)
-			chatReq.Parts = append(chatReq.Parts, v.Parts...)
-		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
 			v := new(geminiAPI.Content)
-			msg.ToGemini(v)
+			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
+			if len(chunks) > 0 {
+				chatReq.History = append(chatReq.History, chunks...)
+			}
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			chunks := userMsg.ToGemini(v)
+			if l := len(chunks); l > 0 {
+				chatReq.History = append(chatReq.History, v)
+				if l > 1 {
+					chatReq.History = append(chatReq.History, chunks[:l-1]...)
+				}
+				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
+			} else {
+				chatReq.Parts = append(chatReq.Parts, v.Parts...)
+			}
 		}
 		ch, err := clt.Stream(ctx, &chatReq, llmResp)
 		if err != nil {
@@ -403,8 +480,11 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		}
 		for _, msg := range messages {
 			v := new(openai.ChatCompletionMessage)
-			msg.ToOpenAI(v)
+			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
@@ -426,8 +506,11 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 		}
 		for _, msg := range messages {
 			v := new(anthropic.Message)
-			msg.ToAnthropic(v)
+			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
+			if len(chunks) > 0 {
+				chatReq.Messages = append(chatReq.Messages, chunks...)
+			}
 		}
 		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
@@ -455,8 +538,11 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 				break
 			}
 			v := new(cohere.Message)
-			msg.ToCohere(v)
+			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
+			if len(chunks) > 0 {
+				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
+			}
 		}
 		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
@@ -480,17 +566,28 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 			sysMsg.ToGemini(v)
 			chatReq.System = v
 		}
-		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			userMsg.ToGemini(v)
-			chatReq.Parts = append(chatReq.Parts, v.Parts...)
-		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
 			v := new(geminiAPI.Content)
-			msg.ToGemini(v)
+			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
+			if len(chunks) > 0 {
+				chatReq.History = append(chatReq.History, chunks...)
+			}
+		}
+		if userInput != nil {
+			v := new(geminiAPI.Content)
+			userMsg := components.NewMessage(components.UserRole, *userInput)
+			chunks := userMsg.ToGemini(v)
+			if l := len(chunks); l > 0 {
+				chatReq.History = append(chatReq.History, v)
+				if l > 1 {
+					chatReq.History = append(chatReq.History, chunks[:l-1]...)
+				}
+				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
+			} else {
+				chatReq.Parts = append(chatReq.Parts, v.Parts...)
+			}
 		}
 		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
@@ -525,7 +622,7 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 }
 
 // Run runs the chat agent with the given user input for chain.
-func (a *Agent[I, O]) RunForChain(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
+func (a *Agent[I, O]) RunAnonymous(ctx context.Context, userInput any, apiResp *components.LLMResponse) (any, error) {
 	in, ok := userInput.(*I)
 	if !ok {
 		return nil, errors.New("invalid input schema")
@@ -554,6 +651,18 @@ func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan string, 
 	}
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, nil, nil)
+	}
+	return ch, mergeResp, nil
+}
+
+func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-chan string, MergeResponse, error) {
+	in, ok := userInput.(*I)
+	if !ok {
+		return nil, nil, errors.New("invalid input schema")
+	}
+	ch, mergeResp, err := a.Stream(ctx, in)
+	if err != nil {
+		return nil, mergeResp, err
 	}
 	return ch, mergeResp, nil
 }
