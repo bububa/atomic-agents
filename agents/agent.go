@@ -119,6 +119,15 @@ func (a *Agent[I, O]) ClearMemory() {
 	a.memory.Reset()
 }
 
+func (a *Agent[I, O]) Memory() components.MemoryStore {
+	return a.memory
+}
+
+// AddToMemory add message to memory
+func (a *Agent[I, O]) AddToMemory(msg *components.Message) {
+	a.memory.AddMessage(msg)
+}
+
 func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
 	a.client = clt
 }

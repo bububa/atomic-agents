@@ -12,6 +12,7 @@ type MemoryStore interface {
 	TurnID() string
 	NewTurn() MemoryStore
 	NewMessage(MessageRole, schema.Schema) *Message
+	AddMessage(msg *Message)
 	History() []Message
 	Reset() MemoryStore
 	Copy(MemoryStore)
@@ -73,6 +74,11 @@ func (m *Memory) NewTurn() MemoryStore {
 // NewMessage adds a message to the chat history and manages overflow.
 func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
 	msg := NewMessage(role, content).SetTurnID(m.turnID)
+	m.AddMessage(msg)
+	return msg
+}
+
+func (m *Memory) AddMessage(msg *Message) {
 	m.mtx.Lock()
 	// Manages the chat history overflow based on max_messages constraint.
 	m.history = append(m.history, *msg)
@@ -81,7 +87,6 @@ func (m *Memory) NewMessage(role MessageRole, content schema.Schema) *Message {
 		m.history = m.history[1:]
 	}
 	m.mtx.Unlock()
-	return msg
 }
 
 // SetHistory set a copy of chat history
