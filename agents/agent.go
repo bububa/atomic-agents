@@ -314,6 +314,11 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
 	messages = append(messages, *sysMsg)
 	messages = append(messages, a.memory.History()...)
+	var respType any
+	respType = new(O)
+	if _, ok := respType.(schema.Markdownable); ok {
+		respType = nil
+	}
 	switch clt := a.client.(type) {
 	case instructor.StreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
 		llmResp := new(openai.ChatCompletionResponse)
@@ -336,7 +341,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
@@ -362,7 +367,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
@@ -394,7 +399,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
 			}
 		}
-		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
@@ -439,7 +444,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 				chatReq.Parts = append(chatReq.Parts, v.Parts...)
 			}
 		}
-		ch, err := clt.Stream(ctx, &chatReq, llmResp)
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
