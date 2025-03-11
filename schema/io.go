@@ -1,5 +1,7 @@
 package schema
 
+import "github.com/bububa/mdencoder"
+
 // Input implements BaseAgentInputSchema
 // This schema represents the input from the user to the AI agent.
 type Input struct {
@@ -16,7 +18,8 @@ func NewInput(chatMessage string) *Input {
 }
 
 func (i Input) ToMarkdown() string {
-	return SchemaToMarkdown(i)
+	bs, _ := mdencoder.Encode(i)
+	return string(bs)
 }
 
 // CreateeInput returns a BaseAgentInput

@@ -47,10 +47,12 @@ github.com/aws/smithy-go v1.22.3/go.mod h1:t1ufH5HMublsJYulve2RKmHDC15xu1f26kHCp
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
-github.com/bububa/instructor-go v1.1.7 h1:wJ8gVJop7pxHvwGo9r48+1IDVIR2KVfqwxGX7nIHvZw=
-github.com/bububa/instructor-go v1.1.7/go.mod h1:yrufUXo9ZGyJ/MLiJW9wUiqyLiNBPrNIhlZFAfGmqDo=
+github.com/bububa/instructor-go v1.1.8 h1:HIjMB+1tAE8Qins3L9byxFPkTcq5BldeMIvTHCDTs30=
+github.com/bububa/instructor-go v1.1.8/go.mod h1:yrufUXo9ZGyJ/MLiJW9wUiqyLiNBPrNIhlZFAfGmqDo=
 github.com/bububa/ljson v1.0.1 h1:KyymkUrbsKQtd9yDYNQ6BIiupievR/7Ol1MPK3VVLgc=
 github.com/bububa/ljson v1.0.1/go.mod h1:V0iyqxoher3R2bQKk7uIpNkbogt8MAqe+hyS8WLlYsc=
+github.com/bububa/mdencoder v1.0.1 h1:RN9T4MZlauww1gTzHKcagWtO8p6JVvvUUCRqxqvkhkE=
+github.com/bububa/mdencoder v1.0.1/go.mod h1:/hAnhL8NXInURcYtokrYFbUpaDlPRBlLd5jxK+TMRxU=
 github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
 github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

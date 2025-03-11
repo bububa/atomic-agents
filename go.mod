@@ -1,6 +1,6 @@
 module github.com/bububa/atomic-agents
 
-go 1.23.5
+go 1.23.6
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.0
@@ -8,7 +8,8 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.1
-	github.com/bububa/instructor-go v1.1.7
+	github.com/bububa/instructor-go v1.1.8
+	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.13.0
 	github.com/dgrr/quickxml v0.0.0-20201022091424-4977de546d6c
