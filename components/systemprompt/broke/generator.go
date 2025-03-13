@@ -33,7 +33,10 @@ func New(options ...Option) *Generator {
 	if len(ret.background) == 0 {
 		ret.background = []string{"- This is a conversation with a helpful and friendly AI assistant."}
 	}
-	ret.evolves = append(ret.evolves, "- Always respond using the proper JSON schema.", "- Always use the available additional information and context to enhance the response.")
+	if ret.StrictJSON {
+		ret.evolves = append(ret.evolves, "- Always respond using the proper JSON schema.")
+	}
+	ret.evolves = append(ret.evolves, "- Always use the available additional information and context to enhance the response.")
 	return ret
 }
 

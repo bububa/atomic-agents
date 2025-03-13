@@ -31,3 +31,10 @@ func WithContextProviders(providers ...systemprompt.ContextProvider) Option {
 		g.AddContextProviders(providers...)
 	}
 }
+
+// WithStrictJSON set Generator output in JSON
+func WithStrictJSON(v bool) Option {
+	return func(g *Generator) {
+		g.StrictJSON = v
+	}
+}
