@@ -16,6 +16,7 @@ type Generator interface {
 
 type BaseGenerator struct {
 	contextProviders []ContextProvider
+	StrictJSON       bool
 }
 
 func (g *BaseGenerator) ContextProviders() []ContextProvider {
