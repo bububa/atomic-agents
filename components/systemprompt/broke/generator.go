@@ -36,7 +36,9 @@ func New(options ...Option) *Generator {
 	if ret.StrictJSON {
 		ret.evolves = append(ret.evolves, "- Always respond using the proper JSON schema.")
 	}
-	ret.evolves = append(ret.evolves, "- Always use the available additional information and context to enhance the response.")
+	if len(ret.ContextProviders()) > 0 {
+		ret.evolves = append(ret.evolves, "- Always use the available additional information and context to enhance the response.")
+	}
 	return ret
 }
 
