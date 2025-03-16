@@ -26,9 +26,6 @@ func New(options ...Option) *Generator {
 	if len(ret.background) == 0 {
 		ret.background = []string{"- This is a conversation with a helpful and friendly AI assistant."}
 	}
-	if ret.StrictJSON {
-		ret.outputInstructs = append(ret.outputInstructs, "- Always respond using the proper JSON schema.")
-	}
 	if len(ret.ContextProviders()) > 0 {
 		ret.outputInstructs = append(ret.outputInstructs, "- Always use the available additional information and context to enhance the response.")
 	}

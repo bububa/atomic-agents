@@ -47,8 +47,10 @@ github.com/aws/smithy-go v1.22.3/go.mod h1:t1ufH5HMublsJYulve2RKmHDC15xu1f26kHCp
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
-github.com/bububa/instructor-go v1.2.1 h1:BSDOqU+LqMahC98wauxj2vf2W7wkU4l+I9DLucBtSgc=
-github.com/bububa/instructor-go v1.2.1/go.mod h1:yrufUXo9ZGyJ/MLiJW9wUiqyLiNBPrNIhlZFAfGmqDo=
+github.com/brianvoe/gofakeit/v7 v7.2.1 h1:AGojgaaCdgq4Adzrd2uWdbGNDyX6MWNhHdQBraNfOHI=
+github.com/brianvoe/gofakeit/v7 v7.2.1/go.mod h1:QXuPeBw164PJCzCUZVmgpgHJ3Llj49jSLVkKPMtxtxA=
+github.com/bububa/instructor-go v1.2.4 h1:9xB5y7y2NEH6idY3D++McwMaF8B6KO3PgnDfg2bfo5g=
+github.com/bububa/instructor-go v1.2.4/go.mod h1:hQ9SY5H9gavxYgFFbCQZVcKTI3KfTZT66iRuVo1diK4=
 github.com/bububa/ljson v1.0.1 h1:KyymkUrbsKQtd9yDYNQ6BIiupievR/7Ol1MPK3VVLgc=
 github.com/bububa/ljson v1.0.1/go.mod h1:V0iyqxoher3R2bQKk7uIpNkbogt8MAqe+hyS8WLlYsc=
 github.com/bububa/mdencoder v1.0.1 h1:RN9T4MZlauww1gTzHKcagWtO8p6JVvvUUCRqxqvkhkE=

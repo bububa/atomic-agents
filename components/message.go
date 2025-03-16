@@ -131,6 +131,7 @@ type Message struct {
 	role MessageRole
 	//	turnID is Unique identifier for the turn this message belongs to.
 	turnID string
+	raw    string
 }
 
 // NewMessage returns a new Message
@@ -155,6 +156,10 @@ func (m Message) Role() MessageRole {
 // Content returns message content
 func (m Message) Content() schema.Schema {
 	return m.content
+}
+
+func (m *Message) SetRaw(raw string) {
+	m.raw = raw
 }
 
 // Attachement returns message attachement
@@ -202,11 +207,7 @@ func (m Message) TurnID() string {
 func (m Message) TryAttachChunkPrompt(idx int) string {
 	var txt string
 	if idx == 0 {
-		if v, ok := m.content.(schema.Markdownable); ok {
-			txt = v.ToMarkdown()
-		} else {
-			txt = schema.Stringify(m.content)
-		}
+		txt = schema.Stringify(m.content)
 	}
 	if l := len(m.Chunks()); l > 0 {
 		if idx < l {
@@ -242,6 +243,11 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) []openai.ChatCompl
 }
 
 func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
+	if m.Role() == AssistantRole && m.raw != "" {
+		dist.Role = m.Role()
+		dist.Content = m.raw
+		return nil
+	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -253,11 +259,6 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
-	if v, ok := src.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(src.content)
-	}
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
@@ -295,6 +296,11 @@ func (m Message) ToAnthropic(dist *anthropic.Message) []anthropic.Message {
 }
 
 func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
+	if m.Role() == AssistantRole && m.raw != "" {
+		dist.Role = anthropic.ChatRole(m.Role())
+		dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(m.raw)}
+		return nil
+	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -306,11 +312,6 @@ func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
 	}
 	dist.Role = anthropic.ChatRole(m.role)
 	txt := m.TryAttachChunkPrompt(idx)
-	if v, ok := src.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(src.content)
-	}
 	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.Files) > 0) {
 		images := getImages(attachement.ImageURLs)
 		dist.Content = make([]anthropic.MessageContent, 0, len(images)+len(attachement.Files)+1)
@@ -366,11 +367,6 @@ func (m Message) toCohere(dist *cohere.Message, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
-	if v, ok := m.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(m.content)
-	}
 	switch m.role {
 	case SystemRole:
 		dist.Role = "SYSTEM"
@@ -379,6 +375,9 @@ func (m Message) toCohere(dist *cohere.Message, idx int) error {
 		}
 	case AssistantRole:
 		dist.Role = "CHATBOT"
+		if m.raw != "" {
+			txt = m.raw
+		}
 		dist.System = &cohere.ChatMessage{
 			Message: txt,
 		}
@@ -408,6 +407,11 @@ func (m Message) ToGemini(dist *gemini.Content) []*gemini.Content {
 }
 
 func (m Message) toGemini(dist *gemini.Content, idx int) error {
+	if m.Role() != AssistantRole && m.raw != "" {
+		dist.Role = m.Role()
+		dist.Parts = []gemini.Part{gemini.Text(m.raw)}
+		return nil
+	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -429,12 +433,6 @@ func (m Message) toGemini(dist *gemini.Content, idx int) error {
 		}
 	}
 	txt := m.TryAttachChunkPrompt(idx)
-	dist.Parts = append(dist.Parts, gemini.Text(txt))
-	if v, ok := src.content.(schema.Markdownable); ok {
-		txt = v.ToMarkdown()
-	} else {
-		txt = schema.Stringify(src.content)
-	}
 	dist.Parts = append(dist.Parts, gemini.Text(txt))
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		images := getImages(attachement.ImageURLs)

@@ -18,7 +18,7 @@ func Example_basicChatbot() {
 	mem := components.NewMemory(10)
 	initMsg := mem.NewMessage(components.AssistantRole, schema.CreateOutput("Hello! How can I assist you today?"))
 	agent := agents.NewAgent[schema.Input, schema.Output](
-		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
+		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI, instructor.ModeJSON)),
 		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithTemperature(1),
