@@ -11,7 +11,11 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 )
 
-func NewInstructor(provider instructor.Provider) instructor.Instructor {
+func NewInstructor(provider instructor.Provider, modes ...instructor.Mode) instructor.Instructor {
+	mode := instructor.ModeJSON
+	if len(modes) > 0 {
+		mode = modes[0]
+	}
 	switch provider {
 	case instructor.ProviderAnthropic:
 		authToken := os.Getenv("ANTHROPIC_API_KEY")
@@ -21,7 +25,7 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			opts = append(opts, anthropic.WithBaseURL(baseURL))
 		}
 		clt := anthropic.NewClient(authToken, opts...)
-		return instructors.FromAnthropic(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromAnthropic(clt, instructor.WithMode(mode), instructor.WithMaxRetries(1), instructor.WithValidation())
 	case instructor.ProviderCohere:
 		authToken := os.Getenv("COHERE_API_KEY")
 		baseURL := os.Getenv("COHERE_API_BASE_URL")
@@ -31,15 +35,15 @@ func NewInstructor(provider instructor.Provider) instructor.Instructor {
 			opts = append(opts, cohereOption.WithBaseURL(baseURL))
 		}
 		clt := cohereClient.NewClient(opts...)
-		return instructors.FromCohere(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromCohere(clt, instructor.WithMode(mode), instructor.WithMaxRetries(1), instructor.WithValidation())
 	default:
 		authToken := os.Getenv("OPENAI_API_KEY")
-		baseURL := os.Getenv("OPENAI_API_BASE_URL")
+		baseURL := os.Getenv("OPENAI_BASE_URL")
 		cfg := openai.DefaultConfig(authToken)
 		if baseURL != "" {
 			cfg.BaseURL = baseURL
 		}
 		clt := openai.NewClientWithConfig(cfg)
-		return instructors.FromOpenAI(clt, instructor.WithMode(instructor.ModeJSON), instructor.WithMaxRetries(3), instructor.WithValidation())
+		return instructors.FromOpenAI(clt, instructor.WithMode(mode), instructor.WithMaxRetries(1), instructor.WithValidation())
 	}
 }

@@ -2,8 +2,8 @@ package schema
 
 // Base is a base schema
 type Base struct {
-	attachement *Attachement `json:"-" jsonschema:"-"`
-	chunks      []Schema     `json:"-" jsonschema:"-"`
+	attachement *Attachement `json:"-" yaml:"-" jsonschema:"-"`
+	chunks      []Schema     `json:"-" yaml:"-" jsonschema:"-"`
 }
 
 // Attachement returns schema attachement

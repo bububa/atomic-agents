@@ -154,9 +154,9 @@ func (r *RAG[O]) Run(ctx context.Context, query *schema.String, output *O, llmRe
 		return err
 	}
 	if len(records) == 0 {
-		return fmt.Errorf("no relevant information to answer question: %s", query.ToMarkdown())
+		return fmt.Errorf("no relevant information to answer question: %s", query.String())
 	}
-	input := schema.String(r.contextGenerator(query.ToMarkdown(), records))
+	input := schema.String(r.contextGenerator(query.String(), records))
 	err = r.agent.Run(ctx, &input, output, llmResp)
 	usage.Merge(llmResp.Usage)
 	llmResp.Usage = usage
@@ -210,9 +210,9 @@ func (r *RAG[O]) Stream(ctx context.Context, query *schema.String) (<-chan strin
 		return nil, mergeResp, err
 	}
 	if len(records) == 0 {
-		return nil, mergeResp, fmt.Errorf("no relevant information to answer question: %s", query.ToMarkdown())
+		return nil, mergeResp, fmt.Errorf("no relevant information to answer question: %s", query.String())
 	}
-	input := schema.String(r.contextGenerator(query.ToMarkdown(), records))
+	input := schema.String(r.contextGenerator(query.String(), records))
 	ch, mergeFn, err := streamAgent.Stream(ctx, &input)
 	mergeResp = func(resp *components.LLMResponse) {
 		if mergeFn != nil {
@@ -249,13 +249,13 @@ func (r *RAG[O]) StreamAnonymous(ctx context.Context, query any) (<-chan string,
 
 func (r *RAG[O]) generateEnhancedQuery(ctx context.Context, query *schema.String, llmResp *components.LLMResponse) (string, error) {
 	if r.enhanceQueryAgent == nil {
-		return query.ToMarkdown(), nil
+		return query.String(), nil
 	}
 	var out schema.String
 	if err := r.enhanceQueryAgent.Run(ctx, query, &out, llmResp); err != nil {
 		return "", err
 	}
-	return out.ToMarkdown(), nil
+	return out.String(), nil
 }
 
 func defaultContextGenerator(query string, records []vectordb.Record) string {
