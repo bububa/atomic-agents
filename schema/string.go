@@ -13,6 +13,6 @@ func (s String) Chunks() []Schema {
 	return nil
 }
 
-func (s String) ToMarkdown() string {
+func (s String) String() string {
 	return string(s)
 }

@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
-	github.com/bububa/instructor-go v1.2.1
+	github.com/bububa/instructor-go v1.2.4
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.13.0
@@ -28,6 +28,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	go.uber.org/atomic v1.11.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -49,6 +50,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/brianvoe/gofakeit/v7 v7.2.1 // indirect
 	github.com/bububa/ljson v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -114,5 +116,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4 // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

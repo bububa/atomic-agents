@@ -17,10 +17,6 @@ type SchemaPointer interface {
 	SetAttachement(*Attachement)
 }
 
-type Markdownable interface {
-	ToMarkdown() string
-}
-
 func Stringify(s Schema) string {
 	if v, ok := s.(String); ok {
 		return string(v)

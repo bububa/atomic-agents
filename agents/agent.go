@@ -314,11 +314,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
 	messages = append(messages, *sysMsg)
 	messages = append(messages, a.memory.History()...)
-	var respType any
-	respType = new(O)
-	if _, ok := respType.(schema.Markdownable); ok {
-		respType = nil
-	}
+	respType := new(O)
 	switch clt := a.client.(type) {
 	case instructor.StreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
 		llmResp := new(openai.ChatCompletionResponse)
@@ -454,7 +450,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 }
 
 // Response obtains a response from the language model synchronously
-func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
 	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
@@ -470,7 +466,7 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 	messages = append(messages, a.memory.History()...)
 	var responseType O
 	switch clt := a.client.(type) {
-	case instructor.JSONStreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
+	case instructor.SchemaStreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
 		llmResp := new(openai.ChatCompletionResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromOpenAI(llmResp)
@@ -491,12 +487,12 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
 		return ch, mergeResp, nil
-	case instructor.JSONStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromAnthropic(llmResp)
@@ -517,12 +513,12 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
 		return ch, mergeResp, nil
-	case instructor.JSONStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromCohere(llmResp)
@@ -549,12 +545,12 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
 			}
 		}
-		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
 		return ch, mergeResp, nil
-	case instructor.JSONStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+	case instructor.SchemaStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			resp.FromGemini(llmResp)
@@ -594,7 +590,7 @@ func (a *Agent[I, O]) jsonStream(ctx context.Context, userInput *I) (<-chan any,
 				chatReq.Parts = append(chatReq.Parts, v.Parts...)
 			}
 		}
-		ch, err := clt.JSONStream(ctx, &chatReq, responseType, llmResp)
+		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
@@ -618,7 +614,29 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 	if mode == instructor.ModeToolCall || mode == instructor.ModeToolCallStrict {
 		a.memory.NewMessage(components.FunctionRole, *output)
 	} else {
-		a.memory.NewMessage(components.AssistantRole, *output)
+		msg := a.memory.NewMessage(components.AssistantRole, *output)
+		switch t := apiResp.Details.(type) {
+		case *openai.ChatCompletionResponse:
+			if len(t.Choices) > 0 {
+				msg.SetRaw(t.Choices[0].Message.Content)
+			}
+		case *anthropic.CompleteResponse:
+			msg.SetRaw(t.Completion)
+		case *cohere.NonStreamedChatResponse:
+			msg.SetRaw(t.Text)
+		case *geminiAPI.GenerateContentResponse:
+			for _, candidate := range t.Candidates {
+				if candidate == nil {
+					continue
+				}
+				for _, part := range candidate.Content.Parts {
+					if txt, ok := part.(geminiAPI.Text); ok {
+						msg.SetRaw(string(txt))
+						break
+					}
+				}
+			}
+		}
 	}
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, output, apiResp)
@@ -673,14 +691,14 @@ func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-cha
 }
 
 // Run runs the chat agent with the given user input synchronously.
-func (a *Agent[I, O]) JSONStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+func (a *Agent[I, O]) SchemaStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
 	}
 	if userInput != nil {
 		a.memory.NewTurn()
 	}
-	ch, mergeResp, err := a.jsonStream(ctx, userInput)
+	ch, mergeResp, err := a.schemaStream(ctx, userInput)
 	if err != nil {
 		if fn := a.errorHook; fn != nil {
 			fn(ctx, a, userInput, nil, err)
