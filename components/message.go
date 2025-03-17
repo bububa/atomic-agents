@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bububa/instructor-go"
+	"github.com/bububa/instructor-go/encoding"
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	"github.com/gabriel-vasile/mimetype"
 	gemini "github.com/google/generative-ai-go/genai"
@@ -131,7 +133,10 @@ type Message struct {
 	role MessageRole
 	//	turnID is Unique identifier for the turn this message belongs to.
 	turnID string
-	raw    string
+	// raw original llm response content
+	raw string
+	// mode
+	mode instructor.Mode
 }
 
 // NewMessage returns a new Message
@@ -160,6 +165,32 @@ func (m Message) Content() schema.Schema {
 
 func (m *Message) SetRaw(raw string) {
 	m.raw = raw
+}
+
+func (m *Message) Raw() string {
+	return m.raw
+}
+
+func (m *Message) SetMode(mode instructor.Mode) {
+	m.mode = mode
+}
+
+func (m *Message) Mode() instructor.Mode {
+	return m.mode
+}
+
+func (m *Message) StringifiedContent() string {
+	if m.raw != "" {
+		return m.raw
+	}
+	if m.mode != "" {
+		if enc, err := encoding.PredefinedEncoder(m.mode, m.content); err == nil {
+			if bs, err := enc.Marshal(m.content); err == nil {
+				return string(bs)
+			}
+		}
+	}
+	return schema.Stringify(m.content)
 }
 
 // Attachement returns message attachement
@@ -207,7 +238,7 @@ func (m Message) TurnID() string {
 func (m Message) TryAttachChunkPrompt(idx int) string {
 	var txt string
 	if idx == 0 {
-		txt = schema.Stringify(m.content)
+		txt = m.StringifiedContent()
 	}
 	if l := len(m.Chunks()); l > 0 {
 		if idx < l {
@@ -243,11 +274,6 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) []openai.ChatCompl
 }
 
 func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
-	if m.Role() == AssistantRole && m.raw != "" {
-		dist.Role = m.Role()
-		dist.Content = m.raw
-		return nil
-	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -296,11 +322,6 @@ func (m Message) ToAnthropic(dist *anthropic.Message) []anthropic.Message {
 }
 
 func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
-	if m.Role() == AssistantRole && m.raw != "" {
-		dist.Role = anthropic.ChatRole(m.Role())
-		dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(m.raw)}
-		return nil
-	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -407,11 +428,6 @@ func (m Message) ToGemini(dist *gemini.Content) []*gemini.Content {
 }
 
 func (m Message) toGemini(dist *gemini.Content, idx int) error {
-	if m.Role() != AssistantRole && m.raw != "" {
-		dist.Role = m.Role()
-		dist.Parts = []gemini.Part{gemini.Text(m.raw)}
-		return nil
-	}
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
