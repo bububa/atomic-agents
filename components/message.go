@@ -183,7 +183,7 @@ func (m *Message) StringifiedContent() string {
 	if m.raw != "" {
 		return m.raw
 	}
-	if m.mode != "" {
+	if m.mode != "" && m.role == AssistantRole {
 		if enc, err := encoding.PredefinedEncoder(m.mode, m.content); err == nil {
 			if bs, err := enc.Marshal(m.content); err == nil {
 				return string(bs)
