@@ -17,7 +17,7 @@ func NewInput(chatMessage string) *Input {
 	return ret
 }
 
-func (i Input) ToMarkdown() string {
+func (i Input) String() string {
 	bs, _ := mdencoder.Marshal(i)
 	return string(bs)
 }
