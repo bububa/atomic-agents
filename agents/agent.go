@@ -132,6 +132,10 @@ func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
 	a.client = clt
 }
 
+func (a *Agent[I, O]) Client() instructor.Instructor {
+	return a.client
+}
+
 func (a *Agent[I, O]) SetMemory(m components.MemoryStore) {
 	a.memory = m
 }
