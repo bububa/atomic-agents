@@ -12,10 +12,12 @@ cloud.google.com/go/compute/metadata v0.6.0/go.mod h1:FjyFAW1MW0C203CEOMDTu3Dk1F
 cloud.google.com/go/longrunning v0.6.6 h1:XJNDo5MUfMM05xK3ewpbSdmt7R2Zw+aQEMbdQR65Rbw=
 cloud.google.com/go/longrunning v0.6.6/go.mod h1:hyeGJUrPHcx0u2Uu1UFSoYZLn4lkMrccJig0t4FI7yw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/BurntSushi/toml v1.4.0 h1:kuoIxZQy2WRRk1pttg9asf+WVv6tWQuBNVmK8+nqPr0=
+github.com/BurntSushi/toml v1.4.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/JohannesKaufmann/dom v0.2.0 h1:1bragmEb19K8lHAqgFgqCpiPCFEZMTXzOIEjuxkUfLQ=
 github.com/JohannesKaufmann/dom v0.2.0/go.mod h1:57iSUl5RKric4bUkgos4zu6Xt5LMHUnw3TF1l5CbGZo=
-github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.0 h1:e+ZfpzWc28HIrpIwT+J0wvlK6zkb0ffXHDH9I4QF4lU=
-github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.0/go.mod h1:CD7yrhaD1dBDORPdjkpBrvnrzVIs9kZM6SRteYYUqdA=
+github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.1 h1:aCUWTMxMrxNr7IWnHiZK6Cn9/ebEAmEp5RfsLiGAFOM=
+github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.1/go.mod h1:GELm/VaOL/CGXFPH32mw//nXiMNiEQgtMnLNr4QK/Y8=
 github.com/Knetic/govaluate v3.0.0+incompatible h1:7o6+MAPhYTCF0+fdvoz1xDedhRb4f6s9Tn1Tt7/WTEg=
 github.com/Knetic/govaluate v3.0.0+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/PuerkitoBio/goquery v1.10.2 h1:7fh2BdHcG6VFZsK7toXBT/Bh1z5Wmy8Q9MV9HqT2AM8=
@@ -49,8 +51,8 @@ github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xW
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/brianvoe/gofakeit/v7 v7.2.1 h1:AGojgaaCdgq4Adzrd2uWdbGNDyX6MWNhHdQBraNfOHI=
 github.com/brianvoe/gofakeit/v7 v7.2.1/go.mod h1:QXuPeBw164PJCzCUZVmgpgHJ3Llj49jSLVkKPMtxtxA=
-github.com/bububa/instructor-go v1.2.4 h1:9xB5y7y2NEH6idY3D++McwMaF8B6KO3PgnDfg2bfo5g=
-github.com/bububa/instructor-go v1.2.4/go.mod h1:hQ9SY5H9gavxYgFFbCQZVcKTI3KfTZT66iRuVo1diK4=
+github.com/bububa/instructor-go v1.2.5 h1:klv2dQH5VHV9RcByTFWS2PfE4dmdkVMoGNrRLrMGdr8=
+github.com/bububa/instructor-go v1.2.5/go.mod h1:6D+sWUfdlnhIc/bfzpg+1eXofF2g5Y4vks7hdpZOBlk=
 github.com/bububa/ljson v1.0.1 h1:KyymkUrbsKQtd9yDYNQ6BIiupievR/7Ol1MPK3VVLgc=
 github.com/bububa/ljson v1.0.1/go.mod h1:V0iyqxoher3R2bQKk7uIpNkbogt8MAqe+hyS8WLlYsc=
 github.com/bububa/mdencoder v1.0.1 h1:RN9T4MZlauww1gTzHKcagWtO8p6JVvvUUCRqxqvkhkE=

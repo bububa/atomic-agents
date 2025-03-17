@@ -619,6 +619,7 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 		a.memory.NewMessage(components.FunctionRole, *output)
 	} else {
 		msg := a.memory.NewMessage(components.AssistantRole, *output)
+		msg.SetMode(a.client.Mode())
 		switch t := apiResp.Details.(type) {
 		case *openai.ChatCompletionResponse:
 			if len(t.Choices) > 0 {
