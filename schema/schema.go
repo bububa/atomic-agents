@@ -17,7 +17,14 @@ type SchemaPointer interface {
 	SetAttachement(*Attachement)
 }
 
+type Stringer interface {
+	String() string
+}
+
 func Stringify(s Schema) string {
+	if v, ok := s.(Stringer); ok {
+		return v.String()
+	}
 	if v, ok := s.(String); ok {
 		return string(v)
 	}
