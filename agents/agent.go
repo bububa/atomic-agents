@@ -644,6 +644,9 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
 	}
+	if apiResp == nil {
+		apiResp = new(components.LLMResponse)
+	}
 	if err := a.chat(ctx, userInput, output, apiResp); err != nil {
 		if fn := a.errorHook; fn != nil {
 			fn(ctx, a, userInput, apiResp, err)
