@@ -3,12 +3,12 @@ module github.com/bububa/atomic-agents
 go 1.23.6
 
 require (
-	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.0
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.1
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/PuerkitoBio/goquery v1.10.2
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
-	github.com/bububa/instructor-go v1.2.4
+	github.com/bububa/instructor-go v1.2.7
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.13.0
@@ -38,6 +38,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	cloud.google.com/go/longrunning v0.6.6 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect

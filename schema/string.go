@@ -16,3 +16,8 @@ func (s String) Chunks() []Schema {
 func (s String) String() string {
 	return string(s)
 }
+
+func (s *String) Unmarshal(bs []byte) error {
+	*s = String(bs)
+	return nil
+}
