@@ -358,7 +358,7 @@ func (m Message) toAnthropic(dist *anthropic.Message, idx int) error {
 				MediaType: mimeType.String(),
 				Data:      fmt.Sprintf("data:%s;base64,%s", mimeType.String(), encodedString),
 			}
-			dist.Content = append(dist.Content, anthropic.NewDocumentMessageContent(docSource))
+			dist.Content = append(dist.Content, anthropic.NewDocumentMessageContent(docSource, "", "", false))
 		}
 	}
 	dist.Content = []anthropic.MessageContent{anthropic.NewTextMessageContent(txt)}
