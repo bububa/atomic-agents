@@ -7,9 +7,9 @@ import (
 	"github.com/bububa/instructor-go"
 	"github.com/bububa/instructor-go/instructors/gemini"
 	cohere "github.com/cohere-ai/cohere-go/v2"
-	geminiAPI "github.com/google/generative-ai-go/genai"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	openai "github.com/sashabaranov/go-openai"
+	geminiAPI "google.golang.org/genai"
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
@@ -30,7 +30,7 @@ type TypeableAgent[I schema.Schema, O schema.Schema] interface {
 
 type StreamableAgent[I schema.Schema, O schema.Schema] interface {
 	IAgent
-	Stream(context.Context, *I) (<-chan string, MergeResponse, error)
+	Stream(context.Context, *I) (<-chan instructor.StreamData, MergeResponse, error)
 }
 
 type AnonymousAgent interface {
@@ -40,7 +40,7 @@ type AnonymousAgent interface {
 
 type AnonymousStreamableAgent interface {
 	AnonymousAgent
-	StreamAnonymous(context.Context, any) (<-chan string, MergeResponse, error)
+	StreamAnonymous(context.Context, any) (<-chan instructor.StreamData, MergeResponse, error)
 }
 
 type AgentSetter interface {
@@ -312,7 +312,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 }
 
 // Response obtains a response from the language model synchronously
-func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, MergeResponse, error) {
+func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instructor.StreamData, MergeResponse, error) {
 	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
@@ -478,7 +478,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan string, 
 }
 
 // Response obtains a response from the language model synchronously
-func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan any, <-chan instructor.StreamData, MergeResponse, error) {
 	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
@@ -519,11 +519,11 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
+		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
-			return nil, mergeResp, err
+			return nil, nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
+		return ch, stream, mergeResp, nil
 	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
@@ -549,11 +549,11 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
+		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
-			return nil, mergeResp, err
+			return nil, nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
+		return ch, stream, mergeResp, nil
 	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
@@ -585,11 +585,11 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
 			}
 		}
-		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
+		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
-			return nil, mergeResp, err
+			return nil, nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
+		return ch, stream, mergeResp, nil
 	case instructor.SchemaStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
@@ -634,13 +634,13 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				chatReq.Parts = append(chatReq.Parts, v.Parts...)
 			}
 		}
-		ch, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
+		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
-			return nil, mergeResp, err
+			return nil, nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
+		return ch, stream, mergeResp, nil
 	}
-	return nil, nil, errors.New("unknown instructor provider")
+	return nil, nil, nil, errors.New("unknown instructor provider")
 }
 
 // Run runs the chat agent with the given user input synchronously.
@@ -678,8 +678,8 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 					continue
 				}
 				for _, part := range candidate.Content.Parts {
-					if txt, ok := part.(geminiAPI.Text); ok {
-						msg.SetRaw(string(txt))
+					if txt := part.Text; txt != "" {
+						msg.SetRaw(txt)
 						break
 					}
 				}
@@ -706,7 +706,7 @@ func (a *Agent[I, O]) RunAnonymous(ctx context.Context, userInput any, apiResp *
 }
 
 // Run runs the chat agent with the given user input synchronously.
-func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan string, MergeResponse, error) {
+func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan instructor.StreamData, MergeResponse, error) {
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
 	}
@@ -726,7 +726,7 @@ func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan string, 
 	return ch, mergeResp, nil
 }
 
-func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-chan string, MergeResponse, error) {
+func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-chan instructor.StreamData, MergeResponse, error) {
 	in, ok := userInput.(*I)
 	if !ok {
 		return nil, nil, errors.New("invalid input schema")
@@ -739,24 +739,24 @@ func (a *Agent[I, O]) StreamAnonymous(ctx context.Context, userInput any) (<-cha
 }
 
 // Run runs the chat agent with the given user input synchronously.
-func (a *Agent[I, O]) SchemaStream(ctx context.Context, userInput *I) (<-chan any, MergeResponse, error) {
+func (a *Agent[I, O]) SchemaStream(ctx context.Context, userInput *I) (<-chan any, <-chan instructor.StreamData, MergeResponse, error) {
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
 	}
 	if userInput != nil {
 		a.memory.NewTurn()
 	}
-	ch, mergeResp, err := a.schemaStream(ctx, userInput)
+	ch, stream, mergeResp, err := a.schemaStream(ctx, userInput)
 	if err != nil {
 		if fn := a.errorHook; fn != nil {
 			fn(ctx, a, userInput, nil, err)
 		}
-		return nil, mergeResp, err
+		return nil, nil, mergeResp, err
 	}
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, nil, nil)
 	}
-	return ch, mergeResp, nil
+	return ch, stream, mergeResp, nil
 }
 
 func (a *Agent[I, O]) NewMessage(role components.MessageRole, content schema.Schema) *components.Message {
