@@ -5,7 +5,7 @@ import (
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/embedder"
-	gemini "github.com/google/generative-ai-go/genai"
+	gemini "google.golang.org/genai"
 )
 
 type Embedder struct {
@@ -33,17 +33,20 @@ func New(client *gemini.Client, opts ...embedder.Option) *Embedder {
 
 func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.Embedding, usage *components.LLMUsage) error {
 	// Create an EmbeddingRequest for the user query
-	model := p.EmbeddingModel(p.Model())
-	resp, err := model.EmbedContent(ctx, gemini.Text(text))
+	resp, err := p.Models.EmbedContent(ctx, p.Model(), []*gemini.Content{
+		{
+			Parts: []*gemini.Part{{Text: text}},
+		},
+	}, nil)
 	if err != nil {
 		return err
 	}
-	if resp.Embedding == nil {
+	if len(resp.Embeddings) == 0 {
 		return nil
 	}
 	embedding.Object = text
-	embedding.Embedding = make([]float64, 0, len(resp.Embedding.Values))
-	for _, v := range resp.Embedding.Values {
+	embedding.Embedding = make([]float64, 0, len(resp.Embeddings[0].Values))
+	for _, v := range resp.Embeddings[0].Values {
 		embedding.Embedding = append(embedding.Embedding, float64(v))
 	}
 	embedding.Index = 0
@@ -52,12 +55,11 @@ func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.E
 
 func (p *Embedder) BatchEmbed(ctx context.Context, parts []string, usage *components.LLMUsage) ([]embedder.Embedding, error) {
 	// Create an EmbeddingRequest for the user query
-	model := p.EmbeddingModel(p.Model())
-	batch := model.NewBatch()
+	contents := make([]*gemini.Content, 0, len(parts))
 	for _, part := range parts {
-		batch.AddContent(gemini.Text(part))
+		contents = append(contents, &gemini.Content{Parts: []*gemini.Part{{Text: part}}})
 	}
-	resp, err := model.BatchEmbedContents(ctx, batch)
+	resp, err := p.Models.EmbedContent(ctx, p.Model(), contents, nil)
 	if err != nil {
 		return nil, err
 	}

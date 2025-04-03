@@ -12,6 +12,7 @@ import (
 	"github.com/bububa/atomic-agents/components/embedder"
 	"github.com/bububa/atomic-agents/components/vectordb"
 	"github.com/bububa/atomic-agents/schema"
+	"github.com/bububa/instructor-go"
 )
 
 type Options struct {
@@ -187,7 +188,7 @@ func (r *RAG[O]) RunAnonymous(ctx context.Context, query any, llmResp *component
 	return output, nil
 }
 
-func (r *RAG[O]) Stream(ctx context.Context, query *schema.String) (<-chan string, agents.MergeResponse, error) {
+func (r *RAG[O]) Stream(ctx context.Context, query *schema.String) (<-chan instructor.StreamData, agents.MergeResponse, error) {
 	streamAgent, ok := r.agent.(agents.StreamableAgent[schema.String, O])
 	if !ok {
 		return nil, nil, errors.New("RAG agent is not streamable")
@@ -227,7 +228,7 @@ func (r *RAG[O]) Stream(ctx context.Context, query *schema.String) (<-chan strin
 	return ch, mergeResp, err
 }
 
-func (r *RAG[O]) StreamAnonymous(ctx context.Context, query any) (<-chan string, agents.MergeResponse, error) {
+func (r *RAG[O]) StreamAnonymous(ctx context.Context, query any) (<-chan instructor.StreamData, agents.MergeResponse, error) {
 	if query == nil {
 		return nil, nil, errors.New("nil input")
 	}

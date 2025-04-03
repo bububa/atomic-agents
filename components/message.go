@@ -16,10 +16,10 @@ import (
 	"github.com/bububa/instructor-go/encoding"
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	"github.com/gabriel-vasile/mimetype"
-	gemini "github.com/google/generative-ai-go/genai"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	"github.com/rs/xid"
 	openai "github.com/sashabaranov/go-openai"
+	gemini "google.golang.org/genai"
 
 	"github.com/bububa/atomic-agents/schema"
 )
@@ -99,10 +99,13 @@ func (r *LLMResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 
 func (r *LLMResponse) FromGemini(v *gemini.GenerateContentResponse) {
 	r.Role = AssistantRole
-	if v.UsageMetadata != nil {
-		r.Usage = &LLMUsage{
-			InputTokens:  int(v.UsageMetadata.PromptTokenCount),
-			OutputTokens: int(v.UsageMetadata.CandidatesTokenCount),
+	if v.UsageMetadata != nil && v.UsageMetadata.PromptTokenCount != nil || v.UsageMetadata.CandidatesTokenCount != nil {
+		r.Usage = new(LLMUsage)
+		if n := v.UsageMetadata.PromptTokenCount; n != nil {
+			r.Usage.InputTokens = int(*n)
+		}
+		if n := v.UsageMetadata.CandidatesTokenCount; n != nil {
+			r.Usage.OutputTokens = int(*n)
 		}
 	}
 	r.Details = v.Candidates
@@ -442,24 +445,26 @@ func (m Message) toGemini(dist *gemini.Content, idx int) error {
 		bs := schema.ToBytes(src.content)
 		resp := make(map[string]any)
 		if err := json.Unmarshal(bs, &resp); err == nil {
-			dist.Parts = append(dist.Parts, gemini.FunctionResponse{
-				Response: resp,
+			dist.Parts = append(dist.Parts, &gemini.Part{
+				FunctionResponse: &gemini.FunctionResponse{
+					Response: resp,
+				},
 			})
 			return nil
 		}
 	}
 	txt := m.TryAttachChunkPrompt(idx)
-	dist.Parts = append(dist.Parts, gemini.Text(txt))
+	dist.Parts = append(dist.Parts, &gemini.Part{Text: txt})
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
 		images := getImages(attachement.ImageURLs)
-		dist.Parts = make([]gemini.Part, 0, len(images)+1)
+		dist.Parts = make([]*gemini.Part, 0, len(images)+1)
 		buf := new(bytes.Buffer)
 		for _, img := range images {
 			buf.Reset()
 			jpeg.Encode(buf, img, nil)
 			bs := make([]byte, buf.Len())
 			copy(bs, buf.Bytes())
-			dist.Parts = append(dist.Parts, gemini.ImageData("jpeg", bs))
+			dist.Parts = append(dist.Parts, &gemini.Part{InlineData: &gemini.Blob{Data: bs, MIMEType: "image/jpeg"}})
 		}
 	}
 	return nil
