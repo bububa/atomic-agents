@@ -99,14 +99,10 @@ func (r *LLMResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 
 func (r *LLMResponse) FromGemini(v *gemini.GenerateContentResponse) {
 	r.Role = AssistantRole
-	if v.UsageMetadata != nil && v.UsageMetadata.PromptTokenCount != nil || v.UsageMetadata.CandidatesTokenCount != nil {
+	if v.UsageMetadata != nil && (v.UsageMetadata.PromptTokenCount > 0 || v.UsageMetadata.CandidatesTokenCount > 0) {
 		r.Usage = new(LLMUsage)
-		if n := v.UsageMetadata.PromptTokenCount; n != nil {
-			r.Usage.InputTokens = int(*n)
-		}
-		if n := v.UsageMetadata.CandidatesTokenCount; n != nil {
-			r.Usage.OutputTokens = int(*n)
-		}
+		r.Usage.InputTokens = int(v.UsageMetadata.PromptTokenCount)
+		r.Usage.OutputTokens = int(v.UsageMetadata.CachedContentTokenCount)
 	}
 	r.Details = v.Candidates
 }
