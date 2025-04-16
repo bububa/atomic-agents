@@ -1,23 +1,25 @@
 package schema
 
-type String string
-
-func (s String) Attachement() *Attachement {
-	return nil
+type String struct {
+	Schema
+	value string
 }
 
-func (s String) SetAttachement(v *Attachement) {
-}
-
-func (s String) Chunks() []Schema {
-	return nil
+func NewString(str string) *String {
+	return &String{
+		value: str,
+	}
 }
 
 func (s String) String() string {
-	return string(s)
+	return string(s.value)
+}
+
+func (s String) Bytes() []byte {
+	return []byte(s.value)
 }
 
 func (s *String) Unmarshal(bs []byte) error {
-	*s = String(bs)
+	*s = String{value: string(bs)}
 	return nil
 }

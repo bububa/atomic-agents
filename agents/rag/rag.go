@@ -157,8 +157,8 @@ func (r *RAG[O]) Run(ctx context.Context, query *schema.String, output *O, llmRe
 	if len(records) == 0 {
 		return fmt.Errorf("no relevant information to answer question: %s", query.String())
 	}
-	input := schema.String(r.contextGenerator(query.String(), records))
-	err = r.agent.Run(ctx, &input, output, llmResp)
+	input := schema.NewString(r.contextGenerator(query.String(), records))
+	err = r.agent.Run(ctx, input, output, llmResp)
 	usage.Merge(llmResp.Usage)
 	llmResp.Usage = usage
 	return err
@@ -168,21 +168,21 @@ func (r *RAG[O]) RunAnonymous(ctx context.Context, query any, llmResp *component
 	if query == nil {
 		return nil, errors.New("nil input")
 	}
-	var input schema.String
+	var input *schema.String
 	switch t := query.(type) {
 	case string:
-		input = schema.String(t)
+		input = schema.NewString(t)
 	case schema.String:
-		input = t
+		input = &t
 	case *string:
-		input = schema.String(*t)
+		input = schema.NewString(*t)
 	case *schema.String:
-		input = *t
+		input = t
 	default:
 		return nil, errors.New("invalid input schema")
 	}
 	output := new(O)
-	if err := r.Run(ctx, &input, output, llmResp); err != nil {
+	if err := r.Run(ctx, input, output, llmResp); err != nil {
 		return nil, err
 	}
 	return output, nil
@@ -213,8 +213,8 @@ func (r *RAG[O]) Stream(ctx context.Context, query *schema.String) (<-chan instr
 	if len(records) == 0 {
 		return nil, mergeResp, fmt.Errorf("no relevant information to answer question: %s", query.String())
 	}
-	input := schema.String(r.contextGenerator(query.String(), records))
-	ch, mergeFn, err := streamAgent.Stream(ctx, &input)
+	input := schema.NewString(r.contextGenerator(query.String(), records))
+	ch, mergeFn, err := streamAgent.Stream(ctx, input)
 	mergeResp = func(resp *components.LLMResponse) {
 		if mergeFn != nil {
 			mergeFn(resp)
@@ -232,20 +232,20 @@ func (r *RAG[O]) StreamAnonymous(ctx context.Context, query any) (<-chan instruc
 	if query == nil {
 		return nil, nil, errors.New("nil input")
 	}
-	var input schema.String
+	var input *schema.String
 	switch t := query.(type) {
 	case string:
-		input = schema.String(t)
+		input = schema.NewString(t)
 	case schema.String:
-		input = t
+		input = &t
 	case *string:
-		input = schema.String(*t)
+		input = schema.NewString(*t)
 	case *schema.String:
-		input = *t
+		input = t
 	default:
 		return nil, nil, errors.New("invalid input schema")
 	}
-	return r.Stream(ctx, &input)
+	return r.Stream(ctx, input)
 }
 
 func (r *RAG[O]) generateEnhancedQuery(ctx context.Context, query *schema.String, llmResp *components.LLMResponse) (string, error) {
