@@ -2,18 +2,18 @@ module github.com/bububa/atomic-agents
 
 go 1.23.6
 
-replace github.com/sashabaranov/go-openai => github.com/goodenough227/go-openai v0.0.0-20250313060841-319a8ea883f9
+replace github.com/sashabaranov/go-openai => github.com/bububa/go-openai v1.0.0
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.1
 	github.com/Knetic/govaluate v3.0.0+incompatible
-	github.com/PuerkitoBio/goquery v1.10.2
+	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/aws/aws-sdk-go-v2 v1.36.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.1
-	github.com/bububa/instructor-go v1.3.5
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.2
+	github.com/bububa/instructor-go v1.3.7
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
-	github.com/cohere-ai/cohere-go/v2 v2.13.0
+	github.com/cohere-ai/cohere-go/v2 v2.14.1
 	github.com/dgrr/quickxml v0.0.0-20201022091424-4977de546d6c
 	github.com/fumiama/go-docx v0.0.0-20241231153056-9f8f327c74a5
 	github.com/gabriel-vasile/mimetype v1.4.8
@@ -34,8 +34,8 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.120.0 // indirect
-	cloud.google.com/go/auth v0.15.0 // indirect
+	cloud.google.com/go v0.120.1 // indirect
+	cloud.google.com/go/auth v0.16.0 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
@@ -60,7 +60,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fumiama/imgsz v0.0.4 // indirect
-	github.com/getsentry/sentry-go v0.31.1 // indirect
+	github.com/getsentry/sentry-go v0.32.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -75,12 +75,12 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kaptinlin/jsonrepair v0.1.0 // indirect
+	github.com/kaptinlin/jsonrepair v0.1.1 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
-	github.com/milvus-io/milvus-proto/go-api/v2 v2.5.9 // indirect
+	github.com/milvus-io/milvus-proto/go-api/v2 v2.5.10 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
@@ -110,8 +110,8 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
-	google.golang.org/api v0.228.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250407143221-ac9807e6c755 // indirect
+	google.golang.org/api v0.229.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
 	google.golang.org/grpc v1.71.1 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
