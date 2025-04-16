@@ -1,7 +1,7 @@
 package schema
 
 type String struct {
-	Schema
+	Base
 	value string
 }
 
