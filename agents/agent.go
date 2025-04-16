@@ -182,7 +182,7 @@ func (a *Agent[I, O]) SetErrorHook(fn func(context.Context, *Agent[I, O], *I, *c
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmResponse *components.LLMResponse) error {
-	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
 		a.memory.NewTurn()
@@ -201,6 +201,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			Model:               a.model,
 			Temperature:         a.temperature,
 			MaxCompletionTokens: a.maxTokens,
+		}
+		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
+			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
 			msg.SetMode(a.client.Mode())
@@ -313,7 +316,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instructor.StreamData, MergeResponse, error) {
-	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
 		a.memory.NewTurn()
@@ -343,6 +346,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			Model:               a.model,
 			Temperature:         a.temperature,
 			MaxCompletionTokens: a.maxTokens,
+		}
+		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
+			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
 			msg.SetMode(a.client.Mode())
@@ -479,7 +485,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan any, <-chan instructor.StreamData, MergeResponse, error) {
-	sysMsg := components.NewMessage(components.SystemRole, schema.String(a.systemPromptGenerator.Generate()))
+	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
 	var history []components.Message
 	if userInput != nil {
 		a.memory.NewTurn()
@@ -509,6 +515,9 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			Model:               a.model,
 			Temperature:         a.temperature,
 			MaxCompletionTokens: a.maxTokens,
+		}
+		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
+			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
 			msg.SetMode(a.client.Mode())
