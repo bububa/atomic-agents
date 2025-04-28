@@ -206,7 +206,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(openai.ChatCompletionMessage)
 			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -227,7 +229,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			MaxTokens:   a.maxTokens,
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(anthropic.Message)
 			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -254,7 +258,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			if idx >= lastIdx {
 				break
 			}
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(cohere.Message)
 			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
@@ -279,7 +285,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(geminiAPI.Content)
 			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
@@ -351,7 +359,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(openai.ChatCompletionMessage)
 			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -381,7 +391,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			MaxTokens:   a.maxTokens,
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(anthropic.Message)
 			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -417,7 +429,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			if idx >= lastIdx {
 				break
 			}
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(cohere.Message)
 			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
@@ -452,7 +466,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(geminiAPI.Content)
 			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
@@ -520,7 +536,9 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			chatReq.ExtraBody = extraBody
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(openai.ChatCompletionMessage)
 			chunks := msg.ToOpenAI(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -550,7 +568,9 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			MaxTokens:   a.maxTokens,
 		}
 		for _, msg := range messages {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(anthropic.Message)
 			chunks := msg.ToAnthropic(v)
 			chatReq.Messages = append(chatReq.Messages, *v)
@@ -586,7 +606,9 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			if idx >= lastIdx {
 				break
 			}
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(cohere.Message)
 			chunks := msg.ToCohere(v)
 			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
@@ -621,7 +643,9 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			msg.SetMode(a.client.Mode())
+			if msg.Mode() == "" {
+				msg.SetMode(a.client.Mode())
+			}
 			v := new(geminiAPI.Content)
 			chunks := msg.ToGemini(v)
 			chatReq.History = append(chatReq.History, v)
