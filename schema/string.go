@@ -23,3 +23,7 @@ func (s *String) Unmarshal(bs []byte) error {
 	*s = String{value: string(bs)}
 	return nil
 }
+
+func (s String) MarshalYAML() (any, error) {
+	return s.String(), nil
+}
