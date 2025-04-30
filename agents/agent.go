@@ -694,7 +694,7 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 	if mode == instructor.ModeToolCall || mode == instructor.ModeToolCallStrict {
 		a.memory.NewMessage(components.FunctionRole, *output)
 	} else {
-		msg := a.memory.NewMessage(components.AssistantRole, *output)
+		msg := components.NewMessage(components.AssistantRole, *output)
 		msg.SetMode(a.client.Mode())
 		switch t := apiResp.Details.(type) {
 		case *openai.ChatCompletionResponse:
@@ -718,6 +718,7 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 				}
 			}
 		}
+    a.memory.AddMessage(msg)
 	}
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, output, apiResp)
