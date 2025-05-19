@@ -10,4 +10,6 @@ type Attachement struct {
 	Files []io.Reader `json:"file,omitempty"`
 	// FileIDs llm FileIDs
 	FileIDs []string `json:"file_id,omitempty"`
+  // VideoURLs
+  VideoURLs []string `json:"video_url,omitempty"`
 }

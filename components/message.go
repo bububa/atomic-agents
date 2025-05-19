@@ -284,8 +284,8 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
-	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
-		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+1)
+	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.VideoURLs) > 0){
+		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs) + len(attachement.VideoURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
 			Type: openai.ChatMessagePartTypeText,
 			Text: txt,
@@ -295,6 +295,17 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 				Type: openai.ChatMessagePartTypeImageURL,
 				ImageURL: &openai.ChatMessageImageURL{
 					URL: imageURL,
+				},
+			})
+		}
+		for _, videoURL := range attachement.VideoURLs {
+			dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
+				Type: "video_url",
+				VideoURL: &openai.ChatMessageVideoURL{
+					URL: videoURL,
+				},
+				Video: &openai.ChatMessageVideo{
+					URL: videoURL,
 				},
 			})
 		}
