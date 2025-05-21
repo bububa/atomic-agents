@@ -109,6 +109,10 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 	return ret
 }
 
+func (a *Agent[I, O]) Model() string {
+	return a.model
+}
+
 // ResetMemory resets the memory to its initial state
 func (a *Agent[I, O]) ResetMemory() {
 	a.memory.Copy(a.initialMemory)
