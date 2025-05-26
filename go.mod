@@ -2,15 +2,15 @@ module github.com/bububa/atomic-agents
 
 go 1.24.1
 
-replace github.com/sashabaranov/go-openai => github.com/bububa/go-openai v1.0.5
+replace github.com/sashabaranov/go-openai => github.com/bububa/go-openai v1.0.6
 
 require (
-	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.2
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.3
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/aws/aws-sdk-go-v2 v1.36.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.3
-	github.com/bububa/instructor-go v1.4.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.4
+	github.com/bububa/instructor-go v1.4.6
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.14.1
@@ -20,7 +20,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
-	github.com/liushuangls/go-anthropic/v2 v2.15.0
+	github.com/liushuangls/go-anthropic/v2 v2.15.2
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/pkoukk/tiktoken-go v0.1.7
@@ -34,7 +34,7 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.121.1 // indirect
+	cloud.google.com/go v0.121.2 // indirect
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
@@ -45,7 +45,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.34 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/smithy-go v1.22.3 // indirect
@@ -80,6 +80,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/mark3labs/mcp-go v0.29.0 // indirect
 	github.com/milvus-io/milvus-proto/go-api/v2 v2.5.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -95,23 +96,24 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.1 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	gitlab.com/golang-commonmark/html v0.0.0-20191124015941-a22733972181 // indirect
 	gitlab.com/golang-commonmark/linkify v0.0.0-20200225224916-64bca66f6ad3 // indirect
 	gitlab.com/golang-commonmark/mdurl v0.0.0-20191124015652-932350d1cb84 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
-	go.opentelemetry.io/otel v1.35.0 // indirect
-	go.opentelemetry.io/otel/metric v1.35.0 // indirect
-	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
+	go.opentelemetry.io/otel v1.36.0 // indirect
+	go.opentelemetry.io/otel/metric v1.36.0 // indirect
+	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/image v0.27.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
-	google.golang.org/api v0.233.0 // indirect
+	google.golang.org/api v0.234.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
+	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
