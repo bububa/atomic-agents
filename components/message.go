@@ -183,7 +183,7 @@ func (m *Message) StringifiedContent() string {
 		return m.raw
 	}
 	if m.mode != "" && m.role == AssistantRole {
-		if enc, err := encoding.PredefinedEncoder(m.mode, m.content); err == nil {
+		if enc, err := encoding.PredefinedEncoder(m.mode, m.content, nil); err == nil {
 			if bs, err := enc.Marshal(m.content); err == nil {
 				return string(bs)
 			}
@@ -284,8 +284,8 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 	}
 	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
-	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.VideoURLs) > 0){
-		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs) + len(attachement.VideoURLs)+1)
+	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.VideoURLs) > 0) {
+		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+len(attachement.VideoURLs)+1)
 		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
 			Type: openai.ChatMessagePartTypeText,
 			Text: txt,
