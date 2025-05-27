@@ -694,36 +694,31 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 		}
 		return err
 	}
-	mode := a.client.Mode()
-	if mode == instructor.ModeToolCall || mode == instructor.ModeToolCallStrict {
-		a.memory.NewMessage(components.FunctionRole, *output)
-	} else {
-		msg := components.NewMessage(components.AssistantRole, *output)
-		msg.SetMode(a.client.Mode())
-		switch t := apiResp.Details.(type) {
-		case *openai.ChatCompletionResponse:
-			if len(t.Choices) > 0 {
-				msg.SetRaw(t.Choices[0].Message.Content)
+	msg := components.NewMessage(components.AssistantRole, *output)
+	msg.SetMode(a.client.Mode())
+	switch t := apiResp.Details.(type) {
+	case *openai.ChatCompletionResponse:
+		if len(t.Choices) > 0 {
+			msg.SetRaw(t.Choices[0].Message.Content)
+		}
+	case *anthropic.CompleteResponse:
+		msg.SetRaw(t.Completion)
+	case *cohere.NonStreamedChatResponse:
+		msg.SetRaw(t.Text)
+	case *geminiAPI.GenerateContentResponse:
+		for _, candidate := range t.Candidates {
+			if candidate == nil {
+				continue
 			}
-		case *anthropic.CompleteResponse:
-			msg.SetRaw(t.Completion)
-		case *cohere.NonStreamedChatResponse:
-			msg.SetRaw(t.Text)
-		case *geminiAPI.GenerateContentResponse:
-			for _, candidate := range t.Candidates {
-				if candidate == nil {
-					continue
-				}
-				for _, part := range candidate.Content.Parts {
-					if txt := part.Text; txt != "" {
-						msg.SetRaw(txt)
-						break
-					}
+			for _, part := range candidate.Content.Parts {
+				if txt := part.Text; txt != "" {
+					msg.SetRaw(txt)
+					break
 				}
 			}
 		}
-    a.memory.AddMessage(msg)
 	}
+	a.memory.AddMessage(msg)
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, output, apiResp)
 	}

@@ -3,7 +3,6 @@ package components
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -448,18 +447,6 @@ func (m Message) toGemini(dist *gemini.Content, idx int) error {
 		}
 	}
 	dist.Role = src.role
-	if dist.Role == FunctionRole {
-		bs := schema.ToBytes(src.content)
-		resp := make(map[string]any)
-		if err := json.Unmarshal(bs, &resp); err == nil {
-			dist.Parts = append(dist.Parts, &gemini.Part{
-				FunctionResponse: &gemini.FunctionResponse{
-					Response: resp,
-				},
-			})
-			return nil
-		}
-	}
 	txt := m.TryAttachChunkPrompt(idx)
 	dist.Parts = append(dist.Parts, &gemini.Part{Text: txt})
 	if attachement := src.Attachement(); attachement != nil && len(attachement.ImageURLs) > 0 {
