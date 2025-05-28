@@ -47,8 +47,8 @@ github.com/brianvoe/gofakeit/v7 v7.2.1 h1:AGojgaaCdgq4Adzrd2uWdbGNDyX6MWNhHdQBra
 github.com/brianvoe/gofakeit/v7 v7.2.1/go.mod h1:QXuPeBw164PJCzCUZVmgpgHJ3Llj49jSLVkKPMtxtxA=
 github.com/bububa/go-openai v1.0.6 h1:ty+WZWhGJ1/6xfGFzgZOnC3H7jdUlQoRebdnwxDVgGQ=
 github.com/bububa/go-openai v1.0.6/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
-github.com/bububa/instructor-go v1.4.7 h1:COAiCIc6yJBxEP9ddY2z162uYhmSX8JrE99WYao5t2I=
-github.com/bububa/instructor-go v1.4.7/go.mod h1:R8rAed36bnpI1jTh3pFm/ch97Ndx0ZpOgh8a/ThvRr4=
+github.com/bububa/instructor-go v1.4.9 h1:nfIWO1y6zdy1nri8K6UYvBd+isU3oqCFzUM1zFUHNKU=
+github.com/bububa/instructor-go v1.4.9/go.mod h1:R8rAed36bnpI1jTh3pFm/ch97Ndx0ZpOgh8a/ThvRr4=
 github.com/bububa/ljson v1.0.1 h1:KyymkUrbsKQtd9yDYNQ6BIiupievR/7Ol1MPK3VVLgc=
 github.com/bububa/ljson v1.0.1/go.mod h1:V0iyqxoher3R2bQKk7uIpNkbogt8MAqe+hyS8WLlYsc=
 github.com/bububa/mdencoder v1.0.1 h1:RN9T4MZlauww1gTzHKcagWtO8p6JVvvUUCRqxqvkhkE=
