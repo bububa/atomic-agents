@@ -16,8 +16,9 @@ import (
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	"github.com/gabriel-vasile/mimetype"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/shared/constant"
 	"github.com/rs/xid"
-	openai "github.com/sashabaranov/go-openai"
 	gemini "google.golang.org/genai"
 
 	"github.com/bububa/atomic-agents/schema"
@@ -50,7 +51,7 @@ type LLMResponse struct {
 }
 
 // FromOpenAI convnert response from openai
-func (r *LLMResponse) FromOpenAI(v *openai.ChatCompletionResponse) {
+func (r *LLMResponse) FromOpenAI(v *openai.ChatCompletion) {
 	r.ID = v.ID
 	r.Role = AssistantRole
 	r.Model = v.Model
@@ -67,8 +68,8 @@ func (r *LLMResponse) FromAnthropic(v *anthropic.MessagesResponse) {
 	r.Role = AssistantRole
 	r.Model = string(v.Model)
 	r.Usage = &LLMUsage{
-		InputTokens:  v.Usage.InputTokens,
-		OutputTokens: v.Usage.OutputTokens,
+		InputTokens:  int64(v.Usage.InputTokens),
+		OutputTokens: int64(v.Usage.OutputTokens),
 	}
 	r.Details = v.Content
 }
@@ -83,10 +84,10 @@ func (r *LLMResponse) FromCohere(v *cohere.NonStreamedChatResponse) {
 		if usage := meta.Tokens; usage != nil {
 			r.Usage = new(LLMUsage)
 			if usage.InputTokens != nil {
-				r.Usage.InputTokens = int(*usage.InputTokens)
+				r.Usage.InputTokens = int64(*usage.InputTokens)
 			}
 			if usage.OutputTokens != nil {
-				r.Usage.OutputTokens = int(*usage.OutputTokens)
+				r.Usage.OutputTokens = int64(*usage.OutputTokens)
 			}
 		}
 		if version := meta.ApiVersion; version != nil {
@@ -100,15 +101,15 @@ func (r *LLMResponse) FromGemini(v *gemini.GenerateContentResponse) {
 	r.Role = AssistantRole
 	if v.UsageMetadata != nil && (v.UsageMetadata.PromptTokenCount > 0 || v.UsageMetadata.CandidatesTokenCount > 0) {
 		r.Usage = new(LLMUsage)
-		r.Usage.InputTokens = int(v.UsageMetadata.PromptTokenCount)
-		r.Usage.OutputTokens = int(v.UsageMetadata.CachedContentTokenCount)
+		r.Usage.InputTokens = int64(v.UsageMetadata.PromptTokenCount)
+		r.Usage.OutputTokens = int64(v.UsageMetadata.CachedContentTokenCount)
 	}
 	r.Details = v.Candidates
 }
 
 type LLMUsage struct {
-	InputTokens  int `json:"input_tokens,omitempty"`
-	OutputTokens int `json:"output_tokens,omitempty"`
+	InputTokens  int64 `json:"input_tokens,omitempty"`
+	OutputTokens int64 `json:"output_tokens,omitempty"`
 }
 
 func (u *LLMUsage) Merge(v *LLMUsage) {
@@ -256,12 +257,12 @@ func (m Message) TryAttachChunkPrompt(idx int) string {
 }
 
 // ToOpenAI convert message to openai ChatCompletionMessage
-func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) []openai.ChatCompletionMessage {
+func (m Message) ToOpenAI(dist *openai.ChatCompletionMessageParamUnion) []openai.ChatCompletionMessageParamUnion {
 	m.toOpenAI(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
-		list := make([]openai.ChatCompletionMessage, 0, l)
+		list := make([]openai.ChatCompletionMessageParamUnion, 0, l)
 		for idx := range l {
-			var llmMsg openai.ChatCompletionMessage
+			var llmMsg openai.ChatCompletionMessageParamUnion
 			if err := m.toOpenAI(&llmMsg, idx+1); err == nil {
 				list = append(list, llmMsg)
 			}
@@ -271,7 +272,7 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessage) []openai.ChatCompl
 	return nil
 }
 
-func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
+func (m Message) toOpenAI(dist *openai.ChatCompletionMessageParamUnion, idx int) error {
 	src := m
 	chunks := m.Chunks()
 	if idx > 0 {
@@ -281,35 +282,40 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessage, idx int) error {
 			return errors.New("invalid chunk index")
 		}
 	}
-	dist.Role = m.role
 	txt := m.TryAttachChunkPrompt(idx)
-	if attachement := src.Attachement(); attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.VideoURLs) > 0) {
-		dist.MultiContent = make([]openai.ChatMessagePart, 0, len(attachement.ImageURLs)+len(attachement.VideoURLs)+1)
-		dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
-			Type: openai.ChatMessagePartTypeText,
-			Text: txt,
-		})
+	if attachement := src.Attachement(); m.role == UserRole && attachement != nil && (len(attachement.ImageURLs) > 0 || len(attachement.VideoURLs) > 0) {
+		contents := make([]openai.ChatCompletionContentPartUnionParam, 0, len(attachement.ImageURLs)+len(attachement.VideoURLs)+1)
+		contents = append(contents, openai.TextContentPart(txt))
 		for _, imageURL := range attachement.ImageURLs {
-			dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
-				Type: openai.ChatMessagePartTypeImageURL,
-				ImageURL: &openai.ChatMessageImageURL{
-					URL: imageURL,
-				},
-			})
+			contents = append(contents, openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{
+				URL: imageURL,
+			}))
 		}
 		for _, videoURL := range attachement.VideoURLs {
-			dist.MultiContent = append(dist.MultiContent, openai.ChatMessagePart{
-				Type: "video_url",
-				VideoURL: &openai.ChatMessageVideoURL{
-					URL: videoURL,
-				},
-				Video: &openai.ChatMessageVideo{
-					URL: videoURL,
+			videoParam := &openai.ChatCompletionContentPartImageParam{
+				Type: constant.ImageURL("video_url"),
+			}
+			videoParam.SetExtraFields(map[string]any{
+				"video_url": openai.ImageURL{
+					URL:    videoURL,
+					Detail: openai.ImageURLDetailAuto,
 				},
 			})
+			part := openai.ChatCompletionContentPartUnionParam{
+				OfImageURL: videoParam,
+			}
+			contents = append(contents, part)
 		}
-	} else {
-		dist.Content = txt
+		*dist = openai.UserMessage(contents)
+		return nil
+	}
+	switch m.role {
+	case SystemRole:
+		*dist = openai.SystemMessage(txt)
+	case AssistantRole:
+		*dist = openai.AssistantMessage(txt)
+	case UserRole:
+		*dist = openai.UserMessage(txt)
 	}
 	return nil
 }

@@ -8,7 +8,8 @@ import (
 	cohereClient "github.com/cohere-ai/cohere-go/v2/client"
 	cohereOption "github.com/cohere-ai/cohere-go/v2/option"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 )
 
 func NewInstructor(provider instructor.Provider, modes ...instructor.Mode) instructor.Instructor {
@@ -39,11 +40,13 @@ func NewInstructor(provider instructor.Provider, modes ...instructor.Mode) instr
 	default:
 		authToken := os.Getenv("OPENAI_API_KEY")
 		baseURL := os.Getenv("OPENAI_BASE_URL")
-		cfg := openai.DefaultConfig(authToken)
+		opts := make([]option.RequestOption, 0, 2)
+
+		opts = append(opts, option.WithAPIKey(authToken))
 		if baseURL != "" {
-			cfg.BaseURL = baseURL
+			opts = append(opts, option.WithBaseURL(baseURL))
 		}
-		clt := openai.NewClientWithConfig(cfg)
-		return instructors.FromOpenAI(clt, instructor.WithMode(mode), instructor.WithMaxRetries(1), instructor.WithValidation())
+		clt := openai.NewClient(opts...)
+		return instructors.FromOpenAI(&clt, instructor.WithMode(mode), instructor.WithMaxRetries(1), instructor.WithValidation(), instructor.WithVerbose())
 	}
 }

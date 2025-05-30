@@ -100,12 +100,13 @@ func Example_vision() {
 		agents.WithModel(os.Getenv("OPENAI_VISION_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),
-		agents.WithMaxTokens(1000))
+		agents.WithMaxTokens(1000),
+	)
 
 	attachement := schema.Attachement{
 		ImageURLs: []string{
-			"https://raw.githubusercontent.com/BrainBlend-AI/atomic-agents/refs/heads/main/atomic-examples/basic-multimodal/test_images/nutrition_label_1.png",
-			"https://raw.githubusercontent.com/BrainBlend-AI/atomic-agents/refs/heads/main/atomic-examples/basic-multimodal/test_images/nutrition_label_2.jpg",
+			"https://img1.baidu.com/it/u=3796584098,3946123104&fm=253&fmt=auto&app=138&f=JPEG?w=800&h=1424",
+			"https://nutrition-ai.oss-ap-northeast-1.aliyuncs.com/log/img/10239186114263491872/13785780926862670528.jpg",
 		},
 	}
 	input := &Input{
@@ -113,7 +114,7 @@ func Example_vision() {
 	}
 	input.SetAttachement(&attachement)
 	output := new(Output)
-	apiResp := new(components.ApiResponse)
+	apiResp := new(components.LLMResponse)
 	if err := agent.Run(ctx, input, output, apiResp); err != nil {
 		fmt.Println(err)
 		return

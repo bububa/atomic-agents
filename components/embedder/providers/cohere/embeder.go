@@ -47,10 +47,10 @@ func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.E
 	respV := resp.GetEmbeddingsFloats()
 	if usage != nil && respV.Meta != nil && respV.Meta.Tokens != nil {
 		if v := respV.Meta.Tokens.InputTokens; v != nil {
-			usage.InputTokens = int(*v)
+			usage.InputTokens = int64(*v)
 		}
 		if v := respV.Meta.Tokens.OutputTokens; v != nil {
-			usage.OutputTokens = int(*v)
+			usage.OutputTokens = int64(*v)
 		}
 	}
 	if len(respV.Embeddings) == 0 {
@@ -77,10 +77,10 @@ func (p *Embedder) BatchEmbed(ctx context.Context, parts []string, usage *compon
 	respV := resp.GetEmbeddingsFloats()
 	if usage != nil && respV.Meta != nil && respV.Meta.Tokens != nil {
 		if v := respV.Meta.Tokens.InputTokens; v != nil {
-			usage.InputTokens = int(*v)
+			usage.InputTokens = int64(*v)
 		}
 		if v := respV.Meta.Tokens.OutputTokens; v != nil {
-			usage.OutputTokens = int(*v)
+			usage.OutputTokens = int64(*v)
 		}
 	}
 	ret := make([]embedder.Embedding, 0, len(respV.Embeddings))

@@ -33,9 +33,21 @@ func WithModel(model string) Option {
 	}
 }
 
-func WithTemperature(temperature float32) Option {
+func WithTemperature(temperature float64) Option {
 	return func(c *Config) {
 		c.temperature = temperature
+	}
+}
+
+func WithTopP(topP float64) Option {
+	return func(c *Config) {
+		c.topP = topP
+	}
+}
+
+func WithTopK(topK int) Option {
+	return func(c *Config) {
+		c.topK = topK
 	}
 }
 
