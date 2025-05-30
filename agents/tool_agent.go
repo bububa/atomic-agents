@@ -61,9 +61,19 @@ func (t *ToolAgent[I, T, O]) SetModel(model string) {
 	t.end.model = model
 }
 
-func (t *ToolAgent[I, T, O]) SetTemperature(temperature float32) {
+func (t *ToolAgent[I, T, O]) SetTemperature(temperature float64) {
 	t.start.temperature = temperature
 	t.end.temperature = temperature
+}
+
+func (t *ToolAgent[I, T, O]) SetTopP(topP float64) {
+	t.start.topP = topP
+	t.end.topP = topP
+}
+
+func (t *ToolAgent[I, T, O]) SetTopK(topK int) {
+	t.start.topK = topK
+	t.end.topK = topK
 }
 
 func (t *ToolAgent[I, T, O]) SetMaxTokens(maxTokens int) {

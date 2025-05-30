@@ -2,15 +2,13 @@ module github.com/bububa/atomic-agents
 
 go 1.24.1
 
-replace github.com/sashabaranov/go-openai => github.com/bububa/go-openai v1.0.6
-
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.3
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/aws/aws-sdk-go-v2 v1.36.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.4
-	github.com/bububa/instructor-go v1.4.9
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.0
+	github.com/bububa/instructor-go v1.5.0
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.14.1
@@ -22,14 +20,14 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/liushuangls/go-anthropic/v2 v2.15.2
 	github.com/milvus-io/milvus-sdk-go/v2 v2.4.2
+	github.com/openai/openai-go v1.2.0
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/rs/xid v1.6.0
-	github.com/sashabaranov/go-openai v1.40.0
 	github.com/xuri/excelize/v2 v2.9.1
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	go.uber.org/atomic v1.11.0
-	google.golang.org/genai v1.6.0
+	google.golang.org/genai v1.7.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -53,7 +51,6 @@ require (
 	github.com/brianvoe/gofakeit/v7 v7.2.1 // indirect
 	github.com/bububa/ljson v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/errors v1.12.0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
 	github.com/cockroachdb/redact v1.1.6 // indirect
@@ -61,7 +58,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fumiama/imgsz v0.0.4 // indirect
 	github.com/getsentry/sentry-go v0.33.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
@@ -80,8 +77,8 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
-	github.com/mark3labs/mcp-go v0.29.0 // indirect
-	github.com/milvus-io/milvus-proto/go-api/v2 v2.5.12 // indirect
+	github.com/mark3labs/mcp-go v0.30.1 // indirect
+	github.com/milvus-io/milvus-proto/go-api/v2 v2.5.13 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -92,6 +89,7 @@ require (
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tiendc/go-deepcopy v1.6.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
@@ -112,8 +110,8 @@ require (
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
-	google.golang.org/api v0.234.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
+	google.golang.org/api v0.235.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )

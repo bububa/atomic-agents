@@ -41,7 +41,7 @@ func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.E
 		return err
 	}
 	if usage != nil {
-		usage.InputTokens = int(resp.Usage.TotalTokens)
+		usage.InputTokens = int64(resp.Usage.TotalTokens)
 	}
 	if len(resp.Data) == 0 {
 		return nil
@@ -64,7 +64,7 @@ func (p *Embedder) BatchEmbed(ctx context.Context, parts []string, usage *compon
 		return nil, err
 	}
 	if usage != nil {
-		usage.InputTokens = int(resp.Usage.TotalTokens)
+		usage.InputTokens = int64(resp.Usage.TotalTokens)
 	}
 	ret := make([]embedder.Embedding, 0, len(resp.Data))
 	for _, v := range resp.Data {

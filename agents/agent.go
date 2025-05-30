@@ -2,13 +2,14 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/bububa/instructor-go"
 	"github.com/bububa/instructor-go/instructors/gemini"
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go"
 	geminiAPI "google.golang.org/genai"
 
 	"github.com/bububa/atomic-agents/components"
@@ -48,7 +49,9 @@ type AgentSetter interface {
 	SetMemory(components.MemoryStore)
 	SetSystemPromptGenerator(systemprompt.Generator)
 	SetModel(string)
-	SetTemperature(float32)
+	SetTemperature(float64)
+	SetTopP(float64)
+	SetTopK(int)
 	SetMaxTokens(int)
 }
 
@@ -67,7 +70,11 @@ type Config struct {
 	// model llm model
 	model string
 	// temperature Temperature for response generation, typically ranging from 0 to 1.
-	temperature float32
+	temperature float64
+	// topP
+	topP float64
+	// topK
+	topK int
 	// maxTokens Maximum number of tokens allowed in the response
 	maxTokens int
 	// name is Agent name presentation
@@ -156,8 +163,16 @@ func (a *Agent[I, O]) SetModel(model string) {
 	a.model = model
 }
 
-func (a *Agent[I, O]) SetTemperature(temperature float32) {
+func (a *Agent[I, O]) SetTemperature(temperature float64) {
 	a.temperature = temperature
+}
+
+func (a *Agent[I, O]) SetTopP(topP float64) {
+	a.topP = topP
+}
+
+func (a *Agent[I, O]) SetTopK(topK int) {
+	a.topK = topK
 }
 
 func (a *Agent[I, O]) SetMaxTokens(maxTokens int) {
@@ -200,27 +215,40 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 	messages = append(messages, *sysMsg)
 	messages = append(messages, a.memory.History()...)
 	switch clt := a.client.(type) {
-	case instructor.ChatInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
-		chatReq := openai.ChatCompletionRequest{
-			Model:               a.model,
-			Temperature:         a.temperature,
-			MaxCompletionTokens: a.maxTokens,
+	case instructor.ChatInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+		chatReq := openai.ChatCompletionNewParams{
+			Model:       a.model,
+			Temperature: openai.Float(a.temperature),
+		}
+		if a.temperature > 1e-15 {
+			chatReq.Temperature = openai.Float(a.temperature)
+		}
+		if a.topP > 1e-15 {
+			chatReq.TopP = openai.Float(a.topP)
+		}
+		if a.topK > 0 {
+			chatReq.TopLogprobs = openai.Int(int64(a.topK))
+		}
+		if a.maxTokens > 0 {
+			chatReq.MaxCompletionTokens = openai.Int(int64(a.maxTokens))
 		}
 		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
-			chatReq.ExtraBody = extraBody
+			chatReq.SetExtraFields(map[string]any{
+				"extra_body": extraBody,
+			})
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
 				msg.SetMode(a.client.Mode())
 			}
-			v := new(openai.ChatCompletionMessage)
-			chunks := msg.ToOpenAI(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
+			var v openai.ChatCompletionMessageParamUnion
+			chunks := msg.ToOpenAI(&v)
+			chatReq.Messages = append(chatReq.Messages, v)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
 		}
-		res := new(openai.ChatCompletionResponse)
+		res := new(openai.ChatCompletion)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
 			return err
 		} else if llmResponse != nil {
@@ -228,9 +256,19 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		chatReq := anthropic.MessagesRequest{
-			Model:       anthropic.Model(a.model),
-			Temperature: &a.temperature,
-			MaxTokens:   a.maxTokens,
+			Model: anthropic.Model(a.model),
+		}
+		if v := float32(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float32(a.topP); v > 1e-15 {
+			chatReq.TopP = &v
+		}
+		if v := a.topK; v > 0 {
+			chatReq.TopK = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = v
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
@@ -251,13 +289,20 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
 		lastIdx := len(messages) - 2
-		temperature := float64(a.temperature)
 		chatReq := cohere.ChatRequest{
-			Model:       &a.model,
-			Temperature: &temperature,
-			MaxTokens:   &a.maxTokens,
-			Message:     schema.Stringify(messages[lastIdx].Content()),
+			Model:   &a.model,
+			Message: schema.Stringify(messages[lastIdx].Content()),
 		}
+		if v := float64(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float64(a.topP); v > 1e-15 {
+			chatReq.P = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = &v
+		}
+
 		for idx, msg := range messages {
 			if idx >= lastIdx {
 				break
@@ -343,8 +388,8 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 	messages = append(messages, a.memory.History()...)
 	respType := new(O)
 	switch clt := a.client.(type) {
-	case instructor.StreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
-		llmResp := new(openai.ChatCompletionResponse)
+	case instructor.StreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
 				return
@@ -354,21 +399,33 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 				resp.Model = a.model
 			}
 		}
-		chatReq := openai.ChatCompletionRequest{
-			Model:               a.model,
-			Temperature:         a.temperature,
-			MaxCompletionTokens: a.maxTokens,
+		chatReq := openai.ChatCompletionNewParams{
+			Model: a.model,
+		}
+		if a.temperature > 1e-15 {
+			chatReq.Temperature = openai.Float(a.temperature)
+		}
+		if a.topP > 1e-15 {
+			chatReq.TopP = openai.Float(a.topP)
+		}
+		if a.topK > 0 {
+			chatReq.TopLogprobs = openai.Int(int64(a.topK))
+		}
+		if a.maxTokens > 0 {
+			chatReq.MaxCompletionTokens = openai.Int(int64(a.maxTokens))
 		}
 		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
-			chatReq.ExtraBody = extraBody
+			chatReq.SetExtraFields(map[string]any{
+				"extra_body": extraBody,
+			})
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
 				msg.SetMode(a.client.Mode())
 			}
-			v := new(openai.ChatCompletionMessage)
-			chunks := msg.ToOpenAI(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
+			var v openai.ChatCompletionMessageParamUnion
+			chunks := msg.ToOpenAI(&v)
+			chatReq.Messages = append(chatReq.Messages, v)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
@@ -390,9 +447,19 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			}
 		}
 		chatReq := anthropic.MessagesRequest{
-			Model:       anthropic.Model(a.model),
-			Temperature: &a.temperature,
-			MaxTokens:   a.maxTokens,
+			Model: anthropic.Model(a.model),
+		}
+		if v := float32(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float32(a.topP); v > 1e-15 {
+			chatReq.TopP = &v
+		}
+		if v := a.topK; v > 0 {
+			chatReq.TopK = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = v
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
@@ -422,12 +489,18 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			}
 		}
 		lastIdx := len(messages) - 2
-		temperature := float64(a.temperature)
 		chatReq := cohere.ChatRequest{
-			Model:       &a.model,
-			Temperature: &temperature,
-			MaxTokens:   &a.maxTokens,
-			Message:     schema.Stringify(messages[lastIdx].Content()),
+			Model:   &a.model,
+			Message: schema.Stringify(messages[lastIdx].Content()),
+		}
+		if v := float64(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float64(a.topP); v > 1e-15 {
+			chatReq.P = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = &v
 		}
 		for idx, msg := range messages {
 			if idx >= lastIdx {
@@ -520,8 +593,8 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 	messages = append(messages, a.memory.History()...)
 	var responseType O
 	switch clt := a.client.(type) {
-	case instructor.SchemaStreamInstructor[openai.ChatCompletionRequest, openai.ChatCompletionResponse]:
-		llmResp := new(openai.ChatCompletionResponse)
+	case instructor.SchemaStreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
 				return
@@ -531,21 +604,33 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				resp.Model = a.model
 			}
 		}
-		chatReq := openai.ChatCompletionRequest{
-			Model:               a.model,
-			Temperature:         a.temperature,
-			MaxCompletionTokens: a.maxTokens,
+		chatReq := openai.ChatCompletionNewParams{
+			Model: a.model,
+		}
+		if a.temperature > 1e-15 {
+			chatReq.Temperature = openai.Float(a.temperature)
+		}
+		if a.topP > 1e-15 {
+			chatReq.TopP = openai.Float(a.topP)
+		}
+		if a.topK > 0 {
+			chatReq.TopLogprobs = openai.Int(int64(a.topK))
+		}
+		if a.maxTokens > 0 {
+			chatReq.MaxCompletionTokens = openai.Int(int64(a.maxTokens))
 		}
 		if extraBody := (*userInput).ExtraBody(); extraBody != nil {
-			chatReq.ExtraBody = extraBody
+			chatReq.SetExtraFields(map[string]any{
+				"extra_body": extraBody,
+			})
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
 				msg.SetMode(a.client.Mode())
 			}
-			v := new(openai.ChatCompletionMessage)
-			chunks := msg.ToOpenAI(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
+			var v openai.ChatCompletionMessageParamUnion
+			chunks := msg.ToOpenAI(&v)
+			chatReq.Messages = append(chatReq.Messages, v)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
@@ -567,9 +652,19 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			}
 		}
 		chatReq := anthropic.MessagesRequest{
-			Model:       anthropic.Model(a.model),
-			Temperature: &a.temperature,
-			MaxTokens:   a.maxTokens,
+			Model: anthropic.Model(a.model),
+		}
+		if v := float32(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float32(a.topP); v > 1e-15 {
+			chatReq.TopP = &v
+		}
+		if v := a.topK; v > 0 {
+			chatReq.TopK = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = v
 		}
 		for _, msg := range messages {
 			if msg.Mode() == "" {
@@ -599,12 +694,18 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			}
 		}
 		lastIdx := len(messages) - 2
-		temperature := float64(a.temperature)
 		chatReq := cohere.ChatRequest{
-			Model:       &a.model,
-			Temperature: &temperature,
-			MaxTokens:   &a.maxTokens,
-			Message:     schema.Stringify(messages[lastIdx].Content()),
+			Model:   &a.model,
+			Message: schema.Stringify(messages[lastIdx].Content()),
+		}
+		if v := float64(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float64(a.topP); v > 1e-15 {
+			chatReq.P = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = &v
 		}
 		for idx, msg := range messages {
 			if idx >= lastIdx {
@@ -697,21 +798,45 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 	msg := components.NewMessage(components.AssistantRole, *output)
 	msg.SetMode(a.client.Mode())
 	switch t := apiResp.Details.(type) {
-	case *openai.ChatCompletionResponse:
+	case *openai.ChatCompletion:
 		if len(t.Choices) > 0 {
-			msg.SetRaw(t.Choices[0].Message.Content)
+			choice := t.Choices[0]
+			if toolCalls := choice.Message.ToolCalls; len(toolCalls) > 0 {
+				bs, _ := json.Marshal(toolCalls)
+				msg.SetRaw(string(bs))
+			} else {
+				msg.SetRaw(choice.Message.Content)
+			}
 		}
-	case *anthropic.CompleteResponse:
-		msg.SetRaw(t.Completion)
+	case *anthropic.MessagesResponse:
+		for _, content := range t.Content {
+			if content.Type == anthropic.MessagesContentTypeToolUse {
+				bs, _ := json.Marshal(content.MessageContentToolUse)
+				msg.SetRaw(string(bs))
+				break
+			} else if text := content.Text; text != nil && *text != "" {
+				msg.SetRaw(*text)
+				break
+			}
+		}
 	case *cohere.NonStreamedChatResponse:
-		msg.SetRaw(t.Text)
+		if toolCalls := t.ToolCalls; len(toolCalls) > 0 {
+			bs, _ := json.Marshal(toolCalls)
+			msg.SetRaw(string(bs))
+		} else {
+			msg.SetRaw(t.Text)
+		}
 	case *geminiAPI.GenerateContentResponse:
 		for _, candidate := range t.Candidates {
 			if candidate == nil {
 				continue
 			}
 			for _, part := range candidate.Content.Parts {
-				if txt := part.Text; txt != "" {
+				if toolCall := part.FunctionCall; toolCall != nil {
+					bs, _ := json.Marshal(toolCall)
+					msg.SetRaw(string(bs))
+					break
+				} else if txt := part.Text; txt != "" {
 					msg.SetRaw(txt)
 					break
 				}

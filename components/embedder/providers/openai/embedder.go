@@ -2,8 +2,9 @@ package openai
 
 import (
 	"context"
+	"errors"
 
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go"
 
 	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/embedder"
@@ -34,22 +35,24 @@ func New(client *openai.Client, opts ...embedder.Option) *Embedder {
 
 func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.Embedding, usage *components.LLMUsage) error {
 	// Create an EmbeddingRequest for the user query
-	req := openai.EmbeddingRequest{
-		Input: []string{text},
+	req := openai.EmbeddingNewParams{
+		Input: openai.EmbeddingNewParamsInputUnion{
+			OfString: openai.String(text),
+		},
 		Model: openai.EmbeddingModel(p.Model()),
 	}
-	resp, err := p.CreateEmbeddings(ctx, &req)
+	resp, err := p.Embeddings.New(ctx, req)
 	if err != nil {
 		return err
 	}
 	if usage != nil {
-		usage.InputTokens = int(resp.Usage.TotalTokens)
+		usage.InputTokens = resp.Usage.TotalTokens
 	}
 	if len(resp.Data) == 0 {
 		return nil
 	}
 	ret := resp.Data[0]
-	embedding.Object = ret.Object
+	embedding.Object = text
 	embedding.Embedding = make([]float64, 0, len(ret.Embedding))
 	for _, v := range ret.Embedding {
 		embedding.Embedding = append(embedding.Embedding, float64(v))
@@ -60,16 +63,18 @@ func (p *Embedder) Embed(ctx context.Context, text string, embedding *embedder.E
 
 func (p *Embedder) BatchEmbed(ctx context.Context, parts []string, usage *components.LLMUsage) ([]embedder.Embedding, error) {
 	// Create an EmbeddingRequest for the user query
-	req := openai.EmbeddingRequest{
-		Input: parts,
+	req := openai.EmbeddingNewParams{
+		Input: openai.EmbeddingNewParamsInputUnion{
+			OfArrayOfStrings: parts,
+		},
 		Model: openai.EmbeddingModel(p.Model()),
 	}
-	resp, err := p.CreateEmbeddings(ctx, &req)
+	resp, err := p.Embeddings.New(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	if usage != nil {
-		usage.InputTokens = int(resp.Usage.TotalTokens)
+		usage.InputTokens = resp.Usage.TotalTokens
 	}
 	ret := make([]embedder.Embedding, 0, len(resp.Data))
 	for _, v := range resp.Data {
@@ -78,20 +83,17 @@ func (p *Embedder) BatchEmbed(ctx context.Context, parts []string, usage *compon
 			embeddings = append(embeddings, float64(e))
 		}
 		ret = append(ret, embedder.Embedding{
-			Object:    v.Object,
+			Object:    parts[int(v.Index)],
 			Embedding: embeddings,
-			Index:     v.Index,
+			Index:     int(v.Index),
 		})
 	}
 	return ret, nil
 }
 
 func convertToOpenAI(src *embedder.Embedding, dist *openai.Embedding) {
-	embeddings := make([]float32, 0, len(src.Embedding))
-	for _, e := range src.Embedding {
-		embeddings = append(embeddings, float32(e))
-	}
-	dist.Embedding = embeddings
+	dist.Embedding = make([]float64, len(src.Embedding))
+	copy(dist.Embedding, src.Embedding)
 }
 
 // DotProduct calculates the dot product of the embedding vector with another
@@ -103,9 +105,12 @@ func (p *Embedder) DotProduct(ctx context.Context, target, query *embedder.Embed
 	convertToOpenAI(target, t)
 	q := new(openai.Embedding)
 	convertToOpenAI(query, q)
-	ret, err := t.DotProduct(q)
-	if err != nil {
-		return 0, err
+	if len(t.Embedding) != len(q.Embedding) {
+		return 0, errors.New("vector length mismatch")
 	}
-	return float64(ret), nil
+	var dotProduct float64
+	for i := range t.Embedding {
+		dotProduct += t.Embedding[i] * q.Embedding[i]
+	}
+	return dotProduct, nil
 }
