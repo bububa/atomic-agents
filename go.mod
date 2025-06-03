@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.0
-	github.com/bububa/instructor-go v1.5.5
+	github.com/bububa/instructor-go v1.5.6
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.14.1
