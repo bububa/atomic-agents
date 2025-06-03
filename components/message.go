@@ -132,8 +132,10 @@ type Message struct {
 	role MessageRole
 	//	turnID is Unique identifier for the turn this message belongs to.
 	turnID string
-	// raw original llm response content
-	raw string
+	// rawContent  original llm response content
+	rawContent string
+	// raw any original llm message
+	raw any
 	// mode
 	mode instructor.Mode
 }
@@ -162,11 +164,19 @@ func (m Message) Content() schema.Schema {
 	return m.content
 }
 
-func (m *Message) SetRaw(raw string) {
+func (m *Message) SetRawContent(raw string) {
+	m.rawContent = raw
+}
+
+func (m *Message) RawContent() string {
+	return m.rawContent
+}
+
+func (m *Message) SetRaw(raw any) {
 	m.raw = raw
 }
 
-func (m *Message) Raw() string {
+func (m *Message) Raw() any {
 	return m.raw
 }
 
@@ -179,8 +189,8 @@ func (m *Message) Mode() instructor.Mode {
 }
 
 func (m *Message) StringifiedContent() string {
-	if m.raw != "" {
-		return m.raw
+	if v := m.RawContent(); v != "" {
+		return v
 	}
 	if m.mode != "" && m.role == AssistantRole {
 		if enc, err := encoding.PredefinedEncoder(m.mode, m.content, nil); err == nil {
@@ -258,6 +268,12 @@ func (m Message) TryAttachChunkPrompt(idx int) string {
 
 // ToOpenAI convert message to openai ChatCompletionMessage
 func (m Message) ToOpenAI(dist *openai.ChatCompletionMessageParamUnion) []openai.ChatCompletionMessageParamUnion {
+	if raw := m.Raw(); raw != nil {
+		if v, ok := raw.(openai.ChatCompletionMessageParamUnion); ok {
+			*dist = v
+			return nil
+		}
+	}
 	m.toOpenAI(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
 		list := make([]openai.ChatCompletionMessageParamUnion, 0, l)
@@ -322,6 +338,12 @@ func (m Message) toOpenAI(dist *openai.ChatCompletionMessageParamUnion, idx int)
 
 // ToAnthropic convert message to anthropic Message
 func (m Message) ToAnthropic(dist *anthropic.Message) []anthropic.Message {
+	if raw := m.Raw(); raw != nil {
+		if v, ok := raw.(anthropic.Message); ok {
+			*dist = v
+			return nil
+		}
+	}
 	m.toAnthropic(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
 		list := make([]anthropic.Message, 0, l)
@@ -411,10 +433,7 @@ func (m Message) toCohere(dist *cohere.Message, idx int) error {
 		}
 	case AssistantRole:
 		dist.Role = "CHATBOT"
-		if m.raw != "" {
-			txt = m.raw
-		}
-		dist.System = &cohere.ChatMessage{
+		dist.Chatbot = &cohere.ChatMessage{
 			Message: txt,
 		}
 	case UserRole:
@@ -428,6 +447,12 @@ func (m Message) toCohere(dist *cohere.Message, idx int) error {
 
 // ToGemini convert message to openai Content
 func (m Message) ToGemini(dist *gemini.Content) []*gemini.Content {
+	if raw := m.Raw(); raw != nil {
+		if v, ok := raw.(*gemini.Content); ok {
+			*dist = *v
+			return nil
+		}
+	}
 	m.toGemini(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
 		list := make([]*gemini.Content, 0, l)

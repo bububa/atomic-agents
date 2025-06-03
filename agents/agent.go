@@ -2,7 +2,6 @@ package agents
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/bububa/instructor-go"
@@ -215,7 +214,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 	messages = append(messages, *sysMsg)
 	messages = append(messages, a.memory.History()...)
 	switch clt := a.client.(type) {
-	case instructor.ChatInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+	case instructor.ChatInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
 		chatReq := openai.ChatCompletionNewParams{
 			Model:       a.model,
 			Temperature: openai.Float(a.temperature),
@@ -254,7 +253,24 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromOpenAI(res)
 		}
-	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		if memory := clt.Memory(); memory != nil {
+			for _, v := range memory.List() {
+				var role components.MessageRole
+				if v.OfAssistant != nil {
+					role = components.AssistantRole
+				} else if v.OfUser != nil {
+					role = components.UserRole
+				} else if v.OfTool != nil {
+					role = components.ToolRole
+				} else if v.OfFunction != nil {
+					role = components.FunctionRole
+				}
+				msg := components.NewMessage(role, nil)
+				msg.SetRaw(v)
+				a.memory.AddMessage(msg)
+			}
+		}
+	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
 		chatReq := anthropic.MessagesRequest{
 			Model: anthropic.Model(a.model),
 		}
@@ -287,7 +303,21 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromAnthropic(res)
 		}
-	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		if memory := clt.Memory(); memory != nil {
+			for _, v := range memory.List() {
+				var role components.MessageRole
+				switch v.Role {
+				case anthropic.RoleAssistant:
+					role = components.AssistantRole
+				case anthropic.RoleUser:
+					role = components.UserRole
+				}
+				msg := components.NewMessage(role, nil)
+				msg.SetRaw(v)
+				a.memory.AddMessage(msg)
+			}
+		}
+	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
 		lastIdx := len(messages) - 2
 		chatReq := cohere.ChatRequest{
 			Model:   &a.model,
@@ -323,7 +353,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromCohere(res)
 		}
-	case instructor.ChatInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+	case instructor.ChatInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
 		chatReq := gemini.Request{
 			Model: a.model,
 		}
@@ -364,6 +394,20 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromGemini(res)
 		}
+		if memory := clt.Memory(); memory != nil {
+			for _, v := range memory.List() {
+				var role components.MessageRole
+				switch v.Role {
+				case geminiAPI.RoleModel:
+					role = components.AssistantRole
+				case geminiAPI.RoleUser:
+					role = components.UserRole
+				}
+				msg := components.NewMessage(role, nil)
+				msg.SetRaw(v)
+				a.memory.AddMessage(msg)
+			}
+		}
 	}
 	if llmResponse != nil && llmResponse.Model == "" {
 		llmResponse.Model = a.model
@@ -388,7 +432,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 	messages = append(messages, a.memory.History()...)
 	respType := new(O)
 	switch clt := a.client.(type) {
-	case instructor.StreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+	case instructor.StreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
 		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -434,8 +478,32 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 		if err != nil {
 			return nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
-	case instructor.StreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		out := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			for part := range ch {
+				out <- part
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					if v.OfAssistant != nil {
+						role = components.AssistantRole
+					} else if v.OfUser != nil {
+						role = components.UserRole
+					} else if v.OfTool != nil {
+						role = components.ToolRole
+					} else if v.OfFunction != nil {
+						role = components.FunctionRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, mergeResp, nil
+	case instructor.StreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -476,8 +544,29 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 		if err != nil {
 			return nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
-	case instructor.StreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		out := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			for part := range ch {
+				out <- part
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					switch v.Role {
+					case anthropic.RoleAssistant:
+						role = components.AssistantRole
+					case anthropic.RoleUser:
+						role = components.UserRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, mergeResp, nil
+	case instructor.StreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -521,7 +610,7 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			return nil, mergeResp, err
 		}
 		return ch, mergeResp, nil
-	case instructor.StreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+	case instructor.StreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -571,7 +660,28 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 		if err != nil {
 			return nil, mergeResp, err
 		}
-		return ch, mergeResp, nil
+		out := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			for part := range ch {
+				out <- part
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					switch v.Role {
+					case geminiAPI.RoleModel:
+						role = components.AssistantRole
+					case geminiAPI.RoleUser:
+						role = components.UserRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, mergeResp, nil
 	}
 	return nil, nil, errors.New("unknown instructor provider")
 }
@@ -593,7 +703,7 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 	messages = append(messages, a.memory.History()...)
 	var responseType O
 	switch clt := a.client.(type) {
-	case instructor.SchemaStreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
+	case instructor.SchemaStreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
 		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -639,8 +749,54 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		return ch, stream, mergeResp, nil
-	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		out := make(chan any)
+		streamOut := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			defer close(streamOut)
+			var (
+				chClosed     bool
+				streamClosed bool
+			)
+			for {
+				select {
+				case part, ok := <-stream:
+					if ok {
+						streamOut <- part
+					} else {
+						streamClosed = true
+					}
+				case part, ok := <-ch:
+					if ok {
+						out <- part
+					} else {
+						chClosed = true
+					}
+				}
+				if streamClosed && chClosed {
+					break
+				}
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					if v.OfAssistant != nil {
+						role = components.AssistantRole
+					} else if v.OfUser != nil {
+						role = components.UserRole
+					} else if v.OfTool != nil {
+						role = components.ToolRole
+					} else if v.OfFunction != nil {
+						role = components.FunctionRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, streamOut, mergeResp, nil
+	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -681,8 +837,51 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		return ch, stream, mergeResp, nil
-	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		out := make(chan any)
+		streamOut := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			defer close(streamOut)
+			var (
+				chClosed     bool
+				streamClosed bool
+			)
+			for {
+				select {
+				case part, ok := <-stream:
+					if ok {
+						streamOut <- part
+					} else {
+						streamClosed = true
+					}
+				case part, ok := <-ch:
+					if ok {
+						out <- part
+					} else {
+						chClosed = true
+					}
+				}
+				if streamClosed && chClosed {
+					break
+				}
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					switch v.Role {
+					case anthropic.RoleAssistant:
+						role = components.AssistantRole
+					case anthropic.RoleUser:
+						role = components.UserRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, streamOut, mergeResp, nil
+	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -726,7 +925,7 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			return nil, nil, mergeResp, err
 		}
 		return ch, stream, mergeResp, nil
-	case instructor.SchemaStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse]:
+	case instructor.SchemaStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -776,7 +975,50 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		return ch, stream, mergeResp, nil
+		out := make(chan any)
+		streamOut := make(chan instructor.StreamData)
+		go func() {
+			defer close(out)
+			defer close(streamOut)
+			var (
+				chClosed     bool
+				streamClosed bool
+			)
+			for {
+				select {
+				case part, ok := <-stream:
+					if ok {
+						streamOut <- part
+					} else {
+						streamClosed = true
+					}
+				case part, ok := <-ch:
+					if ok {
+						out <- part
+					} else {
+						chClosed = true
+					}
+				}
+				if streamClosed && chClosed {
+					break
+				}
+			}
+			if memory := clt.Memory(); memory != nil {
+				for _, v := range memory.List() {
+					var role components.MessageRole
+					switch v.Role {
+					case geminiAPI.RoleModel:
+						role = components.AssistantRole
+					case geminiAPI.RoleUser:
+						role = components.UserRole
+					}
+					msg := components.NewMessage(role, nil)
+					msg.SetRaw(v)
+					a.memory.AddMessage(msg)
+				}
+			}
+		}()
+		return out, streamOut, mergeResp, nil
 	}
 	return nil, nil, nil, errors.New("unknown instructor provider")
 }
@@ -795,55 +1037,55 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 		}
 		return err
 	}
-	msg := components.NewMessage(components.AssistantRole, *output)
-	msg.SetMode(a.client.Mode())
-	switch t := apiResp.Details.(type) {
-	case *openai.ChatCompletion:
-		if len(t.Choices) > 0 {
-			choice := t.Choices[0]
-			if toolCalls := choice.Message.ToolCalls; len(toolCalls) > 0 {
-				bs, _ := json.Marshal(toolCalls)
-				msg.SetRaw(string(bs))
-			} else {
-				msg.SetRaw(choice.Message.Content)
-			}
-		}
-	case *anthropic.MessagesResponse:
-		for _, content := range t.Content {
-			if content.Type == anthropic.MessagesContentTypeToolUse {
-				bs, _ := json.Marshal(content.MessageContentToolUse)
-				msg.SetRaw(string(bs))
-				break
-			} else if text := content.Text; text != nil && *text != "" {
-				msg.SetRaw(*text)
-				break
-			}
-		}
-	case *cohere.NonStreamedChatResponse:
-		if toolCalls := t.ToolCalls; len(toolCalls) > 0 {
-			bs, _ := json.Marshal(toolCalls)
-			msg.SetRaw(string(bs))
-		} else {
-			msg.SetRaw(t.Text)
-		}
-	case *geminiAPI.GenerateContentResponse:
-		for _, candidate := range t.Candidates {
-			if candidate == nil {
-				continue
-			}
-			for _, part := range candidate.Content.Parts {
-				if toolCall := part.FunctionCall; toolCall != nil {
-					bs, _ := json.Marshal(toolCall)
-					msg.SetRaw(string(bs))
-					break
-				} else if txt := part.Text; txt != "" {
-					msg.SetRaw(txt)
-					break
-				}
-			}
-		}
-	}
-	a.memory.AddMessage(msg)
+	// msg := components.NewMessage(components.AssistantRole, *output)
+	// msg.SetMode(a.client.Mode())
+	// switch t := apiResp.Details.(type) {
+	// case *openai.ChatCompletion:
+	// 	if len(t.Choices) > 0 {
+	// 		choice := t.Choices[0]
+	// 		if toolCalls := choice.Message.ToolCalls; len(toolCalls) > 0 {
+	// 			bs, _ := json.Marshal(toolCalls)
+	// 			msg.SetRawContent(string(bs))
+	// 		} else {
+	// 			msg.SetRawContent(choice.Message.Content)
+	// 		}
+	// 	}
+	// case *anthropic.MessagesResponse:
+	// 	for _, content := range t.Content {
+	// 		if content.Type == anthropic.MessagesContentTypeToolUse {
+	// 			bs, _ := json.Marshal(content.MessageContentToolUse)
+	// 			msg.SetRawContent(string(bs))
+	// 			break
+	// 		} else if text := content.Text; text != nil && *text != "" {
+	// 			msg.SetRawContent(*text)
+	// 			break
+	// 		}
+	// 	}
+	// case *cohere.NonStreamedChatResponse:
+	// 	if toolCalls := t.ToolCalls; len(toolCalls) > 0 {
+	// 		bs, _ := json.Marshal(toolCalls)
+	// 		msg.SetRawContent(string(bs))
+	// 	} else {
+	// 		msg.SetRawContent(t.Text)
+	// 	}
+	// case *geminiAPI.GenerateContentResponse:
+	// 	for _, candidate := range t.Candidates {
+	// 		if candidate == nil {
+	// 			continue
+	// 		}
+	// 		for _, part := range candidate.Content.Parts {
+	// 			if toolCall := part.FunctionCall; toolCall != nil {
+	// 				bs, _ := json.Marshal(toolCall)
+	// 				msg.SetRawContent(string(bs))
+	// 				break
+	// 			} else if txt := part.Text; txt != "" {
+	// 				msg.SetRawContent(txt)
+	// 				break
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// a.memory.AddMessage(msg)
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, output, apiResp)
 	}
