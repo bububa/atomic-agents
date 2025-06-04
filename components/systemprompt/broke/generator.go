@@ -48,7 +48,7 @@ func (g *Generator) Generate() string {
 			"KEY RESULTS":                          g.keyResults,
 			"OPTIMIZATION and OUTPUT INSTRUCTIONS": g.evolves,
 		}
-		promptParts []string
+		promptParts = make([]string, 0, len(sections)*3+len(g.ContextProviders())*3)
 	)
 	for _, title := range []string{"BACKGROUND and PURPOSE", "CAPACITY and ROLE", "OBJECTIVEs and TASKs", "KEY RESULTS", "OPTIMIZATION and OUTPUT INSTRUCTIONS"} {
 		content := sections[title]
