@@ -39,7 +39,7 @@ func (g *Generator) Generate() string {
 			"INTERNAL ASSISTANT STEPS": g.steps,
 			"OUTPUT INSTRUCTIONS":      g.outputInstructs,
 		}
-		promptParts []string
+		promptParts = make([]string, 0, 9+len(g.ContextProviders())*3)
 	)
 	for _, title := range []string{"IDENTITY and PURPOSE", "INTERNAL ASSISTANT STEPS", "OUTPUT INSTRUCTIONS"} {
 		content := sections[title]
