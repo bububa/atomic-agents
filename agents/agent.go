@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/bububa/instructor-go"
@@ -255,17 +256,34 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 		if memory := clt.Memory(); memory != nil {
 			for _, v := range memory.List() {
+				msg := new(components.Message)
 				var role components.MessageRole
 				if v.OfAssistant != nil {
 					role = components.AssistantRole
+					if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
+						calls := make([]components.ToolCall, 0, len(toolCalls))
+						for _, tool := range toolCalls {
+							calls = append(calls, components.ToolCall{
+								ID:        tool.ID,
+								Name:      tool.Function.Name,
+								Arguments: tool.Function.Arguments,
+							})
+						}
+						msg.SetToolCalls(calls)
+					}
 				} else if v.OfUser != nil {
 					role = components.UserRole
 				} else if v.OfTool != nil {
 					role = components.ToolRole
+					call := components.ToolCallback{
+						ID:      v.OfTool.ToolCallID,
+						Content: v.OfTool.Content.OfString.String(),
+					}
+					msg.SetToolCallbacks([]components.ToolCallback{call})
 				} else if v.OfFunction != nil {
 					role = components.FunctionRole
 				}
-				msg := components.NewMessage(role, nil)
+				msg.SetRole(role)
 				msg.SetRaw(v)
 				a.memory.AddMessage(msg)
 			}
@@ -306,13 +324,41 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		if memory := clt.Memory(); memory != nil {
 			for _, v := range memory.List() {
 				var role components.MessageRole
+				msg := new(components.Message)
 				switch v.Role {
 				case anthropic.RoleAssistant:
 					role = components.AssistantRole
+					var toolCalls []components.ToolCall
+					for _, content := range v.Content {
+						if toolUse := content.MessageContentToolUse; toolUse != nil {
+							bs, _ := json.Marshal(toolUse.Input)
+							toolCalls = append(toolCalls, components.ToolCall{
+								ID:        toolUse.ID,
+								Name:      toolUse.Name,
+								Arguments: string(bs),
+							})
+						}
+					}
+					if len(toolCalls) > 0 {
+						msg.SetToolCalls(toolCalls)
+					}
 				case anthropic.RoleUser:
 					role = components.UserRole
+					var calls []components.ToolCallback
+					for _, content := range v.Content {
+						if toolResult := content.MessageContentToolResult; toolResult != nil {
+							calls = append(calls, components.ToolCallback{
+								ID:      *toolResult.ToolUseID,
+								Content: *toolResult.Content[0].Text,
+								IsError: *toolResult.IsError,
+							})
+						}
+					}
+					if len(calls) > 0 {
+						msg.SetToolCallbacks(calls)
+					}
 				}
-				msg := components.NewMessage(role, nil)
+				msg.SetRole(role)
 				msg.SetRaw(v)
 				a.memory.AddMessage(msg)
 			}
@@ -397,13 +443,42 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		if memory := clt.Memory(); memory != nil {
 			for _, v := range memory.List() {
 				var role components.MessageRole
+				msg := new(components.Message)
 				switch v.Role {
 				case geminiAPI.RoleModel:
 					role = components.AssistantRole
+					var tools []components.ToolCall
+					for _, part := range v.Parts {
+						if call := part.FunctionCall; call != nil {
+							bs, _ := json.Marshal(call.Args)
+							tools = append(tools, components.ToolCall{
+								ID:        call.ID,
+								Name:      call.Name,
+								Arguments: string(bs),
+							})
+						}
+					}
+					if len(tools) > 0 {
+						msg.SetToolCalls(tools)
+					}
 				case geminiAPI.RoleUser:
 					role = components.UserRole
+					var calls []components.ToolCallback
+					for _, part := range v.Parts {
+						if fn := part.FunctionResponse; fn != nil {
+							bs, _ := json.Marshal(fn.Response)
+							calls = append(calls, components.ToolCallback{
+								ID:      fn.ID,
+								Name:    fn.Name,
+								Content: string(bs),
+							})
+						}
+					}
+					if len(calls) > 0 {
+						msg.SetToolCallbacks(calls)
+					}
 				}
-				msg := components.NewMessage(role, nil)
+				msg.SetRole(role)
 				msg.SetRaw(v)
 				a.memory.AddMessage(msg)
 			}
@@ -486,17 +561,34 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			}
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
+					msg := new(components.Message)
 					var role components.MessageRole
 					if v.OfAssistant != nil {
 						role = components.AssistantRole
+						if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
+							calls := make([]components.ToolCall, 0, len(toolCalls))
+							for _, tool := range toolCalls {
+								calls = append(calls, components.ToolCall{
+									ID:        tool.ID,
+									Name:      tool.Function.Name,
+									Arguments: tool.Function.Arguments,
+								})
+							}
+							msg.SetToolCalls(calls)
+						}
 					} else if v.OfUser != nil {
 						role = components.UserRole
 					} else if v.OfTool != nil {
 						role = components.ToolRole
+						call := components.ToolCallback{
+							ID:      v.OfTool.ToolCallID,
+							Content: v.OfTool.Content.OfString.String(),
+						}
+						msg.SetToolCallbacks([]components.ToolCallback{call})
 					} else if v.OfFunction != nil {
 						role = components.FunctionRole
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}
@@ -553,13 +645,41 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
 					var role components.MessageRole
+					msg := new(components.Message)
 					switch v.Role {
 					case anthropic.RoleAssistant:
 						role = components.AssistantRole
+						var toolCalls []components.ToolCall
+						for _, content := range v.Content {
+							if toolUse := content.MessageContentToolUse; toolUse != nil {
+								bs, _ := json.Marshal(toolUse.Input)
+								toolCalls = append(toolCalls, components.ToolCall{
+									ID:        toolUse.ID,
+									Name:      toolUse.Name,
+									Arguments: string(bs),
+								})
+							}
+						}
+						if len(toolCalls) > 0 {
+							msg.SetToolCalls(toolCalls)
+						}
 					case anthropic.RoleUser:
 						role = components.UserRole
+						var calls []components.ToolCallback
+						for _, content := range v.Content {
+							if toolResult := content.MessageContentToolResult; toolResult != nil {
+								calls = append(calls, components.ToolCallback{
+									ID:      *toolResult.ToolUseID,
+									Content: *toolResult.Content[0].Text,
+									IsError: *toolResult.IsError,
+								})
+							}
+						}
+						if len(calls) > 0 {
+							msg.SetToolCallbacks(calls)
+						}
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}
@@ -669,13 +789,42 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
 					var role components.MessageRole
+					msg := new(components.Message)
 					switch v.Role {
 					case geminiAPI.RoleModel:
 						role = components.AssistantRole
+						var tools []components.ToolCall
+						for _, part := range v.Parts {
+							if call := part.FunctionCall; call != nil {
+								bs, _ := json.Marshal(call.Args)
+								tools = append(tools, components.ToolCall{
+									ID:        call.ID,
+									Name:      call.Name,
+									Arguments: string(bs),
+								})
+							}
+						}
+						if len(tools) > 0 {
+							msg.SetToolCalls(tools)
+						}
 					case geminiAPI.RoleUser:
 						role = components.UserRole
+						var calls []components.ToolCallback
+						for _, part := range v.Parts {
+							if fn := part.FunctionResponse; fn != nil {
+								bs, _ := json.Marshal(fn.Response)
+								calls = append(calls, components.ToolCallback{
+									ID:      fn.ID,
+									Name:    fn.Name,
+									Content: string(bs),
+								})
+							}
+						}
+						if len(calls) > 0 {
+							msg.SetToolCallbacks(calls)
+						}
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}
@@ -779,17 +928,34 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			}
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
+					msg := new(components.Message)
 					var role components.MessageRole
 					if v.OfAssistant != nil {
 						role = components.AssistantRole
+						if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
+							calls := make([]components.ToolCall, 0, len(toolCalls))
+							for _, tool := range toolCalls {
+								calls = append(calls, components.ToolCall{
+									ID:        tool.ID,
+									Name:      tool.Function.Name,
+									Arguments: tool.Function.Arguments,
+								})
+							}
+							msg.SetToolCalls(calls)
+						}
 					} else if v.OfUser != nil {
 						role = components.UserRole
 					} else if v.OfTool != nil {
 						role = components.ToolRole
+						call := components.ToolCallback{
+							ID:      v.OfTool.ToolCallID,
+							Content: v.OfTool.Content.OfString.String(),
+						}
+						msg.SetToolCallbacks([]components.ToolCallback{call})
 					} else if v.OfFunction != nil {
 						role = components.FunctionRole
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}
@@ -868,13 +1034,41 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
 					var role components.MessageRole
+					msg := new(components.Message)
 					switch v.Role {
 					case anthropic.RoleAssistant:
 						role = components.AssistantRole
+						var toolCalls []components.ToolCall
+						for _, content := range v.Content {
+							if toolUse := content.MessageContentToolUse; toolUse != nil {
+								bs, _ := json.Marshal(toolUse.Input)
+								toolCalls = append(toolCalls, components.ToolCall{
+									ID:        toolUse.ID,
+									Name:      toolUse.Name,
+									Arguments: string(bs),
+								})
+							}
+						}
+						if len(toolCalls) > 0 {
+							msg.SetToolCalls(toolCalls)
+						}
 					case anthropic.RoleUser:
 						role = components.UserRole
+						var calls []components.ToolCallback
+						for _, content := range v.Content {
+							if toolResult := content.MessageContentToolResult; toolResult != nil {
+								calls = append(calls, components.ToolCallback{
+									ID:      *toolResult.ToolUseID,
+									Content: *toolResult.Content[0].Text,
+									IsError: *toolResult.IsError,
+								})
+							}
+						}
+						if len(calls) > 0 {
+							msg.SetToolCallbacks(calls)
+						}
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}
@@ -1006,13 +1200,42 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			if memory := clt.Memory(); memory != nil {
 				for _, v := range memory.List() {
 					var role components.MessageRole
+					msg := new(components.Message)
 					switch v.Role {
 					case geminiAPI.RoleModel:
 						role = components.AssistantRole
+						var tools []components.ToolCall
+						for _, part := range v.Parts {
+							if call := part.FunctionCall; call != nil {
+								bs, _ := json.Marshal(call.Args)
+								tools = append(tools, components.ToolCall{
+									ID:        call.ID,
+									Name:      call.Name,
+									Arguments: string(bs),
+								})
+							}
+						}
+						if len(tools) > 0 {
+							msg.SetToolCalls(tools)
+						}
 					case geminiAPI.RoleUser:
 						role = components.UserRole
+						var calls []components.ToolCallback
+						for _, part := range v.Parts {
+							if fn := part.FunctionResponse; fn != nil {
+								bs, _ := json.Marshal(fn.Response)
+								calls = append(calls, components.ToolCallback{
+									ID:      fn.ID,
+									Name:    fn.Name,
+									Content: string(bs),
+								})
+							}
+						}
+						if len(calls) > 0 {
+							msg.SetToolCallbacks(calls)
+						}
 					}
-					msg := components.NewMessage(role, nil)
+					msg.SetRole(role)
 					msg.SetRaw(v)
 					a.memory.AddMessage(msg)
 				}

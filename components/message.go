@@ -138,6 +138,9 @@ type Message struct {
 	raw any
 	// mode
 	mode instructor.Mode
+
+	toolCalls     []ToolCall
+	toolCallbacks []ToolCallback
 }
 
 // NewMessage returns a new Message
@@ -154,9 +157,17 @@ func (m *Message) SetTurnID(turnID string) *Message {
 	return m
 }
 
+func (m *Message) SetRole(role MessageRole) {
+	m.role = role
+}
+
 // Role returns message role
 func (m Message) Role() MessageRole {
 	return m.role
+}
+
+func (m *Message) SetContent(content schema.Schema) {
+	m.content = content
 }
 
 // Content returns message content
@@ -186,6 +197,22 @@ func (m *Message) SetMode(mode instructor.Mode) {
 
 func (m *Message) Mode() instructor.Mode {
 	return m.mode
+}
+
+func (m *Message) SetToolCalls(calls []ToolCall) {
+	m.toolCalls = calls
+}
+
+func (m *Message) ToolCalls() []ToolCall {
+	return m.toolCalls
+}
+
+func (m *Message) SetToolCallbacks(callbacks []ToolCallback) {
+	m.toolCallbacks = callbacks
+}
+
+func (m *Message) ToolCallacks() []ToolCallback {
+	return m.toolCallbacks
 }
 
 func (m *Message) StringifiedContent() string {
@@ -274,6 +301,19 @@ func (m Message) ToOpenAI(dist *openai.ChatCompletionMessageParamUnion) []openai
 			return nil
 		}
 	}
+	if len(m.toolCalls) > 0 {
+		ToolCallsToOpenAI(m.toolCalls, dist)
+		return nil
+	} else if len(m.toolCallbacks) > 0 {
+		list := ToolCallbacksToOpenAI(m.toolCallbacks)
+		l := len(list)
+		if l > 0 {
+			*dist = list[0]
+		} else if l > 1 {
+			return list[1:l]
+		}
+		return nil
+	}
 	m.toOpenAI(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
 		list := make([]openai.ChatCompletionMessageParamUnion, 0, l)
@@ -343,6 +383,13 @@ func (m Message) ToAnthropic(dist *anthropic.Message) []anthropic.Message {
 			*dist = v
 			return nil
 		}
+	}
+	if len(m.toolCalls) > 0 {
+		ToolCallsToAnthropic(m.toolCalls, dist)
+		return nil
+	} else if len(m.toolCallbacks) > 0 {
+		ToolCallbacksToAnthropic(m.toolCallbacks, dist)
+		return nil
 	}
 	m.toAnthropic(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
@@ -452,6 +499,13 @@ func (m Message) ToGemini(dist *gemini.Content) []*gemini.Content {
 			*dist = *v
 			return nil
 		}
+	}
+	if len(m.toolCalls) > 0 {
+		ToolCallsToGemini(m.toolCalls, dist)
+		return nil
+	} else if len(m.toolCallbacks) > 0 {
+		ToolCallbacksToGemini(m.toolCallbacks, dist)
+		return nil
 	}
 	m.toGemini(dist, 0)
 	if l := len(m.Chunks()); l > 0 {
