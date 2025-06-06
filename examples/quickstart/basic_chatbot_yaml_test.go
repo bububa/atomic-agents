@@ -26,10 +26,8 @@ func (o Output) String() string {
 
 func Example_basicChatbotYAML() {
 	ctx := context.Background()
-	mem := components.NewMemory(10)
 	agent := agents.NewAgent[schema.Input, Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI, instructor.ModeYAML)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithTemperature(1),
 		agents.WithMaxTokens(1000))

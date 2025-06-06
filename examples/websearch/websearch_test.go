@@ -49,7 +49,6 @@ func Example_websearch() {
 	defer cancel()
 	srv := startSearxngServer(mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
-	mem := components.NewMemory(10)
 	searchInput := searxng.NewInput(searxng.GeneralCategory, []string{mockQuery})
 	searchTool := searxng.New(searxng.WithBaseURL(mockSearchURL), searxng.WithMaxResults(3))
 	searchOutput := new(searxng.Output)
@@ -79,7 +78,6 @@ func Example_websearch() {
 	)
 	agent := agents.NewAgent[Input, Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),

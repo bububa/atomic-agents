@@ -3,7 +3,6 @@ package agents
 import (
 	"github.com/bububa/instructor-go"
 
-	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt"
 )
 
@@ -12,12 +11,6 @@ type Option func(a *Config)
 func WithClient(clt instructor.Instructor) Option {
 	return func(c *Config) {
 		c.client = clt
-	}
-}
-
-func WithMemory(m components.MemoryStore) Option {
-	return func(a *Config) {
-		a.memory = m
 	}
 }
 
