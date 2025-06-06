@@ -25,11 +25,6 @@ type CustomOutput struct {
 
 func Example_basicCustomChatbotWithCustomSchema() {
 	ctx := context.Background()
-	mem := components.NewMemory(10)
-	initMsg := mem.NewMessage(components.AssistantRole, CustomOutput{
-		ChatMessage:            "Hello! How can I assist you today?",
-		SuggestedUserQuestions: []string{"What can you do?", "Tell me a joke", "Tell me about how you were made"},
-	})
 	systemPromptGenerator := cot.New(
 		cot.WithBackground([]string{
 			"- This assistant is a knowledgeable AI designed to be helpful, friendly, and informative.",
@@ -49,7 +44,6 @@ func Example_basicCustomChatbotWithCustomSchema() {
 	)
 	agent := agents.NewAgent[schema.Input, CustomOutput](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(1),
@@ -63,7 +57,6 @@ func Example_basicCustomChatbotWithCustomSchema() {
 	}
 	fmt.Println(agent.SystemPrompt())
 	fmt.Println("")
-	fmt.Printf("Agent: %s\n", initMsg.Content().(CustomOutput).ChatMessage)
 	fmt.Printf("User: %s\n", input.ChatMessage)
 	fmt.Printf("Agent: %s\n", output.ChatMessage)
 	for idx, sug := range output.SuggestedUserQuestions {

@@ -2,11 +2,14 @@ package agents
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/bububa/instructor-go"
+	anthropicClt "github.com/bububa/instructor-go/instructors/anthropic"
+	cohereClt "github.com/bububa/instructor-go/instructors/cohere"
 	"github.com/bububa/instructor-go/instructors/gemini"
+	geminiClt "github.com/bububa/instructor-go/instructors/gemini"
+	openaiClt "github.com/bububa/instructor-go/instructors/openai"
 	cohere "github.com/cohere-ai/cohere-go/v2"
 	anthropic "github.com/liushuangls/go-anthropic/v2"
 	"github.com/openai/openai-go"
@@ -46,7 +49,7 @@ type AnonymousStreamableAgent interface {
 
 type AgentSetter interface {
 	SetClient(instructor.Instructor)
-	SetMemory(components.MemoryStore)
+	SetMemory(*instructor.Memory)
 	SetSystemPromptGenerator(systemprompt.Generator)
 	SetModel(string)
 	SetTemperature(float64)
@@ -59,12 +62,8 @@ type AgentSetter interface {
 type Config struct {
 	// client Client for interacting with the language model
 	client instructor.Instructor
-	//	memory  Memory component for storing chat history.
-	memory components.MemoryStore
 	//	systemPromptGenerator Component for generating system prompts.
 	systemPromptGenerator systemprompt.Generator
-	// initialMemory (AgentMemory): Initial state of the memory
-	initialMemory components.MemoryStore
 	// currentUserInput
 	// currentUserInput schema.Schema
 	// model llm model
@@ -105,14 +104,9 @@ func NewAgent[I schema.Schema, O schema.Schema](options ...Option) *Agent[I, O] 
 	for _, opt := range options {
 		opt(&ret.Config)
 	}
-	if ret.memory == nil {
-		ret.memory = components.NewMemory(0)
-	}
 	if ret.systemPromptGenerator == nil {
 		ret.systemPromptGenerator = cot.New()
 	}
-	ret.initialMemory = components.NewMemory(0)
-	ret.initialMemory.Copy(ret.memory)
 	return ret
 }
 
@@ -120,23 +114,18 @@ func (a *Agent[I, O]) Model() string {
 	return a.model
 }
 
-// ResetMemory resets the memory to its initial state
-func (a *Agent[I, O]) ResetMemory() {
-	a.memory.Copy(a.initialMemory)
-}
-
-// ClearMemory resets the memory to its initial state
-func (a *Agent[I, O]) ClearMemory() {
-	a.memory.Reset()
-}
-
-func (a *Agent[I, O]) Memory() components.MemoryStore {
-	return a.memory
+func (a *Agent[I, O]) Memory() *instructor.Memory {
+	if a.client == nil {
+		return nil
+	}
+	return a.client.Memory()
 }
 
 // AddToMemory add message to memory
-func (a *Agent[I, O]) AddToMemory(msg *components.Message) {
-	a.memory.AddMessage(msg)
+func (a *Agent[I, O]) AddToMemory(msg instructor.Message) {
+	if memory := a.Memory(); memory != nil {
+		memory.Add(msg)
+	}
 }
 
 func (a *Agent[I, O]) SetClient(clt instructor.Instructor) {
@@ -151,8 +140,10 @@ func (a *Agent[I, O]) Encoder() instructor.Encoder {
 	return a.Client().Encoder()
 }
 
-func (a *Agent[I, O]) SetMemory(m components.MemoryStore) {
-	a.memory = m
+func (a *Agent[I, O]) SetMemory(m *instructor.Memory) {
+	if a.client != nil {
+		a.client.SetMemory(m)
+	}
 }
 
 func (a *Agent[I, O]) SetSystemPromptGenerator(g systemprompt.Generator) {
@@ -201,21 +192,21 @@ func (a *Agent[I, O]) SetErrorHook(fn func(context.Context, *Agent[I, O], *I, *c
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmResponse *components.LLMResponse) error {
-	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
-	var history []components.Message
-	if userInput != nil {
-		a.memory.NewTurn()
-		a.memory.NewMessage(components.UserRole, *userInput)
-		history = make([]components.Message, a.memory.MessageCount())
-		copy(history, a.memory.History())
-	} else {
-		history = a.memory.History()
+	sysMsg := instructor.Message{
+		Role: instructor.SystemRole,
+		Text: a.systemPromptGenerator.Generate(),
 	}
-	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
-	messages = append(messages, *sysMsg)
-	messages = append(messages, a.memory.History()...)
+	history := a.Memory().List()
+	messages := make([]instructor.Message, 0, len(history)+2)
+	messages = append(messages, sysMsg)
+	messages = append(messages, history...)
+	inputMsg := instructor.Message{
+		Role: instructor.UserRole,
+	}
+	schema.ToMessage(*userInput, &inputMsg)
+	messages = append(messages, inputMsg)
 	switch clt := a.client.(type) {
-	case instructor.ChatInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
+	case instructor.ChatInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
 		chatReq := openai.ChatCompletionNewParams{
 			Model:       a.model,
 			Temperature: openai.Float(a.temperature),
@@ -238,12 +229,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			})
 		}
 		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			var v openai.ChatCompletionMessageParamUnion
-			chunks := msg.ToOpenAI(&v)
-			chatReq.Messages = append(chatReq.Messages, v)
+			chunks := openaiClt.ConvertMessageFrom(&msg)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
@@ -254,41 +240,7 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromOpenAI(res)
 		}
-		if memory := clt.Memory(); memory != nil {
-			for _, v := range memory.List() {
-				msg := new(components.Message)
-				var role components.MessageRole
-				if v.OfAssistant != nil {
-					role = components.AssistantRole
-					if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
-						calls := make([]components.ToolCall, 0, len(toolCalls))
-						for _, tool := range toolCalls {
-							calls = append(calls, components.ToolCall{
-								ID:        tool.ID,
-								Name:      tool.Function.Name,
-								Arguments: tool.Function.Arguments,
-							})
-						}
-						msg.SetToolCalls(calls)
-					}
-				} else if v.OfUser != nil {
-					role = components.UserRole
-				} else if v.OfTool != nil {
-					role = components.ToolRole
-					call := components.ToolCallback{
-						ID:      v.OfTool.ToolCallID,
-						Content: v.OfTool.Content.OfString.String(),
-					}
-					msg.SetToolCallbacks([]components.ToolCallback{call})
-				} else if v.OfFunction != nil {
-					role = components.FunctionRole
-				}
-				msg.SetRole(role)
-				msg.SetRaw(v)
-				a.memory.AddMessage(msg)
-			}
-		}
-	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
+	case instructor.ChatInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		chatReq := anthropic.MessagesRequest{
 			Model: anthropic.Model(a.model),
 		}
@@ -305,15 +257,9 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 			chatReq.MaxTokens = v
 		}
 		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(anthropic.Message)
-			chunks := msg.ToAnthropic(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
-			if len(chunks) > 0 {
-				chatReq.Messages = append(chatReq.Messages, chunks...)
-			}
+			var v anthropic.Message
+			anthropicClt.ConvertMessageFrom(&msg, &v)
+			chatReq.Messages = append(chatReq.Messages, v)
 		}
 		res := new(anthropic.MessagesResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -321,53 +267,11 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromAnthropic(res)
 		}
-		if memory := clt.Memory(); memory != nil {
-			for _, v := range memory.List() {
-				var role components.MessageRole
-				msg := new(components.Message)
-				switch v.Role {
-				case anthropic.RoleAssistant:
-					role = components.AssistantRole
-					var toolCalls []components.ToolCall
-					for _, content := range v.Content {
-						if toolUse := content.MessageContentToolUse; toolUse != nil {
-							bs, _ := json.Marshal(toolUse.Input)
-							toolCalls = append(toolCalls, components.ToolCall{
-								ID:        toolUse.ID,
-								Name:      toolUse.Name,
-								Arguments: string(bs),
-							})
-						}
-					}
-					if len(toolCalls) > 0 {
-						msg.SetToolCalls(toolCalls)
-					}
-				case anthropic.RoleUser:
-					role = components.UserRole
-					var calls []components.ToolCallback
-					for _, content := range v.Content {
-						if toolResult := content.MessageContentToolResult; toolResult != nil {
-							calls = append(calls, components.ToolCallback{
-								ID:      *toolResult.ToolUseID,
-								Content: *toolResult.Content[0].Text,
-								IsError: *toolResult.IsError,
-							})
-						}
-					}
-					if len(calls) > 0 {
-						msg.SetToolCallbacks(calls)
-					}
-				}
-				msg.SetRole(role)
-				msg.SetRaw(v)
-				a.memory.AddMessage(msg)
-			}
-		}
-	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
-		lastIdx := len(messages) - 2
+	case instructor.ChatInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		lastHistoryIdx := len(messages) - 1
 		chatReq := cohere.ChatRequest{
 			Model:   &a.model,
-			Message: schema.Stringify(messages[lastIdx].Content()),
+			Message: schema.Stringify(*userInput),
 		}
 		if v := float64(a.temperature); v > 1e-15 {
 			chatReq.Temperature = &v
@@ -380,18 +284,12 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		}
 
 		for idx, msg := range messages {
-			if idx >= lastIdx {
+			if idx >= lastHistoryIdx {
 				break
 			}
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(cohere.Message)
-			chunks := msg.ToCohere(v)
-			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
-			if len(chunks) > 0 {
-				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
-			}
+			var v cohere.Message
+			cohereClt.ConvertMessageFrom(&msg, &v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, &v)
 		}
 		res := new(cohere.NonStreamedChatResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
@@ -399,89 +297,31 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 		} else if llmResponse != nil {
 			llmResponse.FromCohere(res)
 		}
-	case instructor.ChatInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
-		chatReq := gemini.Request{
+	case instructor.ChatInstructor[geminiClt.Request, geminiAPI.GenerateContentResponse]:
+		chatReq := geminiClt.Request{
 			Model: a.model,
 		}
 		{
-			v := new(geminiAPI.Content)
-			sysMsg.ToGemini(v)
-			chatReq.System = v
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&sysMsg, &v)
+			chatReq.System = &v
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(geminiAPI.Content)
-			chunks := msg.ToGemini(v)
-			chatReq.History = append(chatReq.History, v)
-			if len(chunks) > 0 {
-				chatReq.History = append(chatReq.History, chunks...)
-			}
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&msg, &v)
+			chatReq.History = append(chatReq.History, &v)
 		}
 		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			chunks := userMsg.ToGemini(v)
-			if l := len(chunks); l > 0 {
-				chatReq.History = append(chatReq.History, v)
-				if l > 1 {
-					chatReq.History = append(chatReq.History, chunks[:l-1]...)
-				}
-				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
-			} else {
-				chatReq.Parts = append(chatReq.Parts, v.Parts...)
-			}
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&inputMsg, &v)
+			chatReq.Parts = append(chatReq.Parts, v.Parts...)
 		}
 		res := new(geminiAPI.GenerateContentResponse)
 		if err := clt.Chat(ctx, &chatReq, response, res); err != nil {
 			return err
 		} else if llmResponse != nil {
 			llmResponse.FromGemini(res)
-		}
-		if memory := clt.Memory(); memory != nil {
-			for _, v := range memory.List() {
-				var role components.MessageRole
-				msg := new(components.Message)
-				switch v.Role {
-				case geminiAPI.RoleModel:
-					role = components.AssistantRole
-					var tools []components.ToolCall
-					for _, part := range v.Parts {
-						if call := part.FunctionCall; call != nil {
-							bs, _ := json.Marshal(call.Args)
-							tools = append(tools, components.ToolCall{
-								ID:        call.ID,
-								Name:      call.Name,
-								Arguments: string(bs),
-							})
-						}
-					}
-					if len(tools) > 0 {
-						msg.SetToolCalls(tools)
-					}
-				case geminiAPI.RoleUser:
-					role = components.UserRole
-					var calls []components.ToolCallback
-					for _, part := range v.Parts {
-						if fn := part.FunctionResponse; fn != nil {
-							bs, _ := json.Marshal(fn.Response)
-							calls = append(calls, components.ToolCallback{
-								ID:      fn.ID,
-								Name:    fn.Name,
-								Content: string(bs),
-							})
-						}
-					}
-					if len(calls) > 0 {
-						msg.SetToolCallbacks(calls)
-					}
-				}
-				msg.SetRole(role)
-				msg.SetRaw(v)
-				a.memory.AddMessage(msg)
-			}
 		}
 	}
 	if llmResponse != nil && llmResponse.Model == "" {
@@ -492,22 +332,22 @@ func (a *Agent[I, O]) chat(ctx context.Context, userInput *I, response *O, llmRe
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instructor.StreamData, MergeResponse, error) {
-	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
-	var history []components.Message
-	if userInput != nil {
-		a.memory.NewTurn()
-		a.memory.NewMessage(components.UserRole, *userInput)
-		history = make([]components.Message, a.memory.MessageCount())
-		copy(history, a.memory.History())
-	} else {
-		history = a.memory.History()
+	sysMsg := instructor.Message{
+		Role: instructor.SystemRole,
+		Text: a.systemPromptGenerator.Generate(),
 	}
-	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
-	messages = append(messages, *sysMsg)
-	messages = append(messages, a.memory.History()...)
+	inputMsg := instructor.Message{
+		Role: instructor.UserRole,
+	}
+	schema.ToMessage(*userInput, &inputMsg)
+	history := a.Memory().List()
+	messages := make([]instructor.Message, 0, len(history)+2)
+	messages = append(messages, sysMsg)
+	messages = append(messages, history...)
+	messages = append(messages, inputMsg)
 	respType := new(O)
 	switch clt := a.client.(type) {
-	case instructor.StreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
+	case instructor.StreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
 		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -539,190 +379,9 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			})
 		}
 		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			var v openai.ChatCompletionMessageParamUnion
-			chunks := msg.ToOpenAI(&v)
-			chatReq.Messages = append(chatReq.Messages, v)
+			chunks := openaiClt.ConvertMessageFrom(&msg)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
-			}
-		}
-		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
-		if err != nil {
-			return nil, mergeResp, err
-		}
-		out := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			for part := range ch {
-				out <- part
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					msg := new(components.Message)
-					var role components.MessageRole
-					if v.OfAssistant != nil {
-						role = components.AssistantRole
-						if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
-							calls := make([]components.ToolCall, 0, len(toolCalls))
-							for _, tool := range toolCalls {
-								calls = append(calls, components.ToolCall{
-									ID:        tool.ID,
-									Name:      tool.Function.Name,
-									Arguments: tool.Function.Arguments,
-								})
-							}
-							msg.SetToolCalls(calls)
-						}
-					} else if v.OfUser != nil {
-						role = components.UserRole
-					} else if v.OfTool != nil {
-						role = components.ToolRole
-						call := components.ToolCallback{
-							ID:      v.OfTool.ToolCallID,
-							Content: v.OfTool.Content.OfString.String(),
-						}
-						msg.SetToolCallbacks([]components.ToolCallback{call})
-					} else if v.OfFunction != nil {
-						role = components.FunctionRole
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, mergeResp, nil
-	case instructor.StreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
-		llmResp := new(anthropic.MessagesResponse)
-		mergeResp := func(resp *components.LLMResponse) {
-			if resp == nil {
-				return
-			}
-			resp.FromAnthropic(llmResp)
-			if resp.Model == "" {
-				resp.Model = a.model
-			}
-		}
-		chatReq := anthropic.MessagesRequest{
-			Model: anthropic.Model(a.model),
-		}
-		if v := float32(a.temperature); v > 1e-15 {
-			chatReq.Temperature = &v
-		}
-		if v := float32(a.topP); v > 1e-15 {
-			chatReq.TopP = &v
-		}
-		if v := a.topK; v > 0 {
-			chatReq.TopK = &v
-		}
-		if v := a.maxTokens; v > 0 {
-			chatReq.MaxTokens = v
-		}
-		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(anthropic.Message)
-			chunks := msg.ToAnthropic(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
-			if len(chunks) > 0 {
-				chatReq.Messages = append(chatReq.Messages, chunks...)
-			}
-		}
-		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
-		if err != nil {
-			return nil, mergeResp, err
-		}
-		out := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			for part := range ch {
-				out <- part
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					var role components.MessageRole
-					msg := new(components.Message)
-					switch v.Role {
-					case anthropic.RoleAssistant:
-						role = components.AssistantRole
-						var toolCalls []components.ToolCall
-						for _, content := range v.Content {
-							if toolUse := content.MessageContentToolUse; toolUse != nil {
-								bs, _ := json.Marshal(toolUse.Input)
-								toolCalls = append(toolCalls, components.ToolCall{
-									ID:        toolUse.ID,
-									Name:      toolUse.Name,
-									Arguments: string(bs),
-								})
-							}
-						}
-						if len(toolCalls) > 0 {
-							msg.SetToolCalls(toolCalls)
-						}
-					case anthropic.RoleUser:
-						role = components.UserRole
-						var calls []components.ToolCallback
-						for _, content := range v.Content {
-							if toolResult := content.MessageContentToolResult; toolResult != nil {
-								calls = append(calls, components.ToolCallback{
-									ID:      *toolResult.ToolUseID,
-									Content: *toolResult.Content[0].Text,
-									IsError: *toolResult.IsError,
-								})
-							}
-						}
-						if len(calls) > 0 {
-							msg.SetToolCallbacks(calls)
-						}
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, mergeResp, nil
-	case instructor.StreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
-		llmResp := new(cohere.NonStreamedChatResponse)
-		mergeResp := func(resp *components.LLMResponse) {
-			if resp == nil {
-				return
-			}
-			resp.FromCohere(llmResp)
-			if resp.Model == "" {
-				resp.Model = a.model
-			}
-		}
-		lastIdx := len(messages) - 2
-		chatReq := cohere.ChatRequest{
-			Model:   &a.model,
-			Message: schema.Stringify(messages[lastIdx].Content()),
-		}
-		if v := float64(a.temperature); v > 1e-15 {
-			chatReq.Temperature = &v
-		}
-		if v := float64(a.topP); v > 1e-15 {
-			chatReq.P = &v
-		}
-		if v := a.maxTokens; v > 0 {
-			chatReq.MaxTokens = &v
-		}
-		for idx, msg := range messages {
-			if idx >= lastIdx {
-				break
-			}
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(cohere.Message)
-			chunks := msg.ToCohere(v)
-			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
-			if len(chunks) > 0 {
-				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
 			}
 		}
 		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
@@ -730,7 +389,81 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 			return nil, mergeResp, err
 		}
 		return ch, mergeResp, nil
-	case instructor.StreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
+	case instructor.StreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
+		llmResp := new(anthropic.MessagesResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			if resp == nil {
+				return
+			}
+			resp.FromAnthropic(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		chatReq := anthropic.MessagesRequest{
+			Model: anthropic.Model(a.model),
+		}
+		if v := float32(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float32(a.topP); v > 1e-15 {
+			chatReq.TopP = &v
+		}
+		if v := a.topK; v > 0 {
+			chatReq.TopK = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = v
+		}
+		for _, msg := range messages {
+			var v anthropic.Message
+			anthropicClt.ConvertMessageFrom(&msg, &v)
+			chatReq.Messages = append(chatReq.Messages, v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.StreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
+		llmResp := new(cohere.NonStreamedChatResponse)
+		mergeResp := func(resp *components.LLMResponse) {
+			if resp == nil {
+				return
+			}
+			resp.FromCohere(llmResp)
+			if resp.Model == "" {
+				resp.Model = a.model
+			}
+		}
+		lastHistoryIdx := len(messages) - 1
+		chatReq := cohere.ChatRequest{
+			Model:   &a.model,
+			Message: schema.Stringify(*userInput),
+		}
+		if v := float64(a.temperature); v > 1e-15 {
+			chatReq.Temperature = &v
+		}
+		if v := float64(a.topP); v > 1e-15 {
+			chatReq.P = &v
+		}
+		if v := a.maxTokens; v > 0 {
+			chatReq.MaxTokens = &v
+		}
+		for idx, msg := range messages {
+			if idx >= lastHistoryIdx {
+				break
+			}
+			var v cohere.Message
+			cohereClt.ConvertMessageFrom(&msg, &v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, &v)
+		}
+		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
+		if err != nil {
+			return nil, mergeResp, err
+		}
+		return ch, mergeResp, nil
+	case instructor.StreamInstructor[geminiClt.Request, geminiAPI.GenerateContentResponse]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -741,118 +474,50 @@ func (a *Agent[I, O]) stream(ctx context.Context, userInput *I) (<-chan instruct
 				resp.Model = a.model
 			}
 		}
-		chatReq := gemini.Request{
+		chatReq := geminiClt.Request{
 			Model: a.model,
 		}
 		{
-
-			v := new(geminiAPI.Content)
-			sysMsg.ToGemini(v)
-			chatReq.System = v
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&sysMsg, &v)
+			chatReq.System = &v
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(geminiAPI.Content)
-			chunks := msg.ToGemini(v)
-			chatReq.History = append(chatReq.History, v)
-			if len(chunks) > 0 {
-				chatReq.History = append(chatReq.History, chunks...)
-			}
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&msg, &v)
+			chatReq.History = append(chatReq.History, &v)
 		}
-		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			chunks := userMsg.ToGemini(v)
-			if l := len(chunks); l > 0 {
-				chatReq.History = append(chatReq.History, v)
-				if l > 1 {
-					chatReq.History = append(chatReq.History, chunks[:l-1]...)
-				}
-				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
-			} else {
-				chatReq.Parts = append(chatReq.Parts, v.Parts...)
-			}
-		}
+		var v geminiAPI.Content
+		geminiClt.ConvertMessageFrom(&inputMsg, &v)
+		chatReq.Parts = append(chatReq.Parts, v.Parts...)
 		ch, err := clt.Stream(ctx, &chatReq, respType, llmResp)
 		if err != nil {
 			return nil, mergeResp, err
 		}
-		out := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			for part := range ch {
-				out <- part
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					var role components.MessageRole
-					msg := new(components.Message)
-					switch v.Role {
-					case geminiAPI.RoleModel:
-						role = components.AssistantRole
-						var tools []components.ToolCall
-						for _, part := range v.Parts {
-							if call := part.FunctionCall; call != nil {
-								bs, _ := json.Marshal(call.Args)
-								tools = append(tools, components.ToolCall{
-									ID:        call.ID,
-									Name:      call.Name,
-									Arguments: string(bs),
-								})
-							}
-						}
-						if len(tools) > 0 {
-							msg.SetToolCalls(tools)
-						}
-					case geminiAPI.RoleUser:
-						role = components.UserRole
-						var calls []components.ToolCallback
-						for _, part := range v.Parts {
-							if fn := part.FunctionResponse; fn != nil {
-								bs, _ := json.Marshal(fn.Response)
-								calls = append(calls, components.ToolCallback{
-									ID:      fn.ID,
-									Name:    fn.Name,
-									Content: string(bs),
-								})
-							}
-						}
-						if len(calls) > 0 {
-							msg.SetToolCallbacks(calls)
-						}
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, mergeResp, nil
+		return ch, mergeResp, nil
 	}
 	return nil, nil, errors.New("unknown instructor provider")
 }
 
 // Response obtains a response from the language model synchronously
 func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan any, <-chan instructor.StreamData, MergeResponse, error) {
-	sysMsg := components.NewMessage(components.SystemRole, *schema.NewString(a.systemPromptGenerator.Generate()))
-	var history []components.Message
-	if userInput != nil {
-		a.memory.NewTurn()
-		a.memory.NewMessage(components.UserRole, *userInput)
-		history = make([]components.Message, a.memory.MessageCount())
-		copy(history, a.memory.History())
-	} else {
-		history = a.memory.History()
+	sysMsg := instructor.Message{
+		Role: instructor.SystemRole,
+		Text: a.systemPromptGenerator.Generate(),
 	}
-	messages := make([]components.Message, 0, a.memory.MessageCount()+1)
-	messages = append(messages, *sysMsg)
-	messages = append(messages, a.memory.History()...)
+	inputMsg := instructor.Message{
+		Role: instructor.UserRole,
+	}
+	schema.ToMessage(*userInput, &inputMsg)
+	history := a.Memory().List()
+	messages := make([]instructor.Message, 0, len(history)+2)
+	messages = append(messages, sysMsg)
+	messages = append(messages, history...)
+	messages = append(messages, inputMsg)
 	var responseType O
 	switch clt := a.client.(type) {
-	case instructor.SchemaStreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion, openai.ChatCompletionMessageParamUnion]:
+	case instructor.SchemaStreamInstructor[openai.ChatCompletionNewParams, openai.ChatCompletion]:
 		llmResp := new(openai.ChatCompletion)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -884,12 +549,7 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			})
 		}
 		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			var v openai.ChatCompletionMessageParamUnion
-			chunks := msg.ToOpenAI(&v)
-			chatReq.Messages = append(chatReq.Messages, v)
+			chunks := openaiClt.ConvertMessageFrom(&msg)
 			if len(chunks) > 0 {
 				chatReq.Messages = append(chatReq.Messages, chunks...)
 			}
@@ -898,71 +558,8 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		out := make(chan any)
-		streamOut := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			defer close(streamOut)
-			var (
-				chClosed     bool
-				streamClosed bool
-			)
-			for {
-				select {
-				case part, ok := <-stream:
-					if ok {
-						streamOut <- part
-					} else {
-						streamClosed = true
-					}
-				case part, ok := <-ch:
-					if ok {
-						out <- part
-					} else {
-						chClosed = true
-					}
-				}
-				if streamClosed && chClosed {
-					break
-				}
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					msg := new(components.Message)
-					var role components.MessageRole
-					if v.OfAssistant != nil {
-						role = components.AssistantRole
-						if toolCalls := v.OfAssistant.ToolCalls; len(toolCalls) > 0 {
-							calls := make([]components.ToolCall, 0, len(toolCalls))
-							for _, tool := range toolCalls {
-								calls = append(calls, components.ToolCall{
-									ID:        tool.ID,
-									Name:      tool.Function.Name,
-									Arguments: tool.Function.Arguments,
-								})
-							}
-							msg.SetToolCalls(calls)
-						}
-					} else if v.OfUser != nil {
-						role = components.UserRole
-					} else if v.OfTool != nil {
-						role = components.ToolRole
-						call := components.ToolCallback{
-							ID:      v.OfTool.ToolCallID,
-							Content: v.OfTool.Content.OfString.String(),
-						}
-						msg.SetToolCallbacks([]components.ToolCallback{call})
-					} else if v.OfFunction != nil {
-						role = components.FunctionRole
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, streamOut, mergeResp, nil
-	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse, anthropic.Message]:
+		return ch, stream, mergeResp, nil
+	case instructor.SchemaStreamInstructor[anthropic.MessagesRequest, anthropic.MessagesResponse]:
 		llmResp := new(anthropic.MessagesResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -989,93 +586,16 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			chatReq.MaxTokens = v
 		}
 		for _, msg := range messages {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(anthropic.Message)
-			chunks := msg.ToAnthropic(v)
-			chatReq.Messages = append(chatReq.Messages, *v)
-			if len(chunks) > 0 {
-				chatReq.Messages = append(chatReq.Messages, chunks...)
-			}
+			var v anthropic.Message
+			anthropicClt.ConvertMessageFrom(&msg, &v)
+			chatReq.Messages = append(chatReq.Messages, v)
 		}
 		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		out := make(chan any)
-		streamOut := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			defer close(streamOut)
-			var (
-				chClosed     bool
-				streamClosed bool
-			)
-			for {
-				select {
-				case part, ok := <-stream:
-					if ok {
-						streamOut <- part
-					} else {
-						streamClosed = true
-					}
-				case part, ok := <-ch:
-					if ok {
-						out <- part
-					} else {
-						chClosed = true
-					}
-				}
-				if streamClosed && chClosed {
-					break
-				}
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					var role components.MessageRole
-					msg := new(components.Message)
-					switch v.Role {
-					case anthropic.RoleAssistant:
-						role = components.AssistantRole
-						var toolCalls []components.ToolCall
-						for _, content := range v.Content {
-							if toolUse := content.MessageContentToolUse; toolUse != nil {
-								bs, _ := json.Marshal(toolUse.Input)
-								toolCalls = append(toolCalls, components.ToolCall{
-									ID:        toolUse.ID,
-									Name:      toolUse.Name,
-									Arguments: string(bs),
-								})
-							}
-						}
-						if len(toolCalls) > 0 {
-							msg.SetToolCalls(toolCalls)
-						}
-					case anthropic.RoleUser:
-						role = components.UserRole
-						var calls []components.ToolCallback
-						for _, content := range v.Content {
-							if toolResult := content.MessageContentToolResult; toolResult != nil {
-								calls = append(calls, components.ToolCallback{
-									ID:      *toolResult.ToolUseID,
-									Content: *toolResult.Content[0].Text,
-									IsError: *toolResult.IsError,
-								})
-							}
-						}
-						if len(calls) > 0 {
-							msg.SetToolCallbacks(calls)
-						}
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, streamOut, mergeResp, nil
-	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse, cohere.Message]:
+		return ch, stream, mergeResp, nil
+	case instructor.SchemaStreamInstructor[cohere.ChatRequest, cohere.NonStreamedChatResponse]:
 		llmResp := new(cohere.NonStreamedChatResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -1086,10 +606,10 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 				resp.Model = a.model
 			}
 		}
-		lastIdx := len(messages) - 2
+		lastHistoryIdx := len(messages) - 1
 		chatReq := cohere.ChatRequest{
 			Model:   &a.model,
-			Message: schema.Stringify(messages[lastIdx].Content()),
+			Message: schema.Stringify(*userInput),
 		}
 		if v := float64(a.temperature); v > 1e-15 {
 			chatReq.Temperature = &v
@@ -1101,25 +621,19 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			chatReq.MaxTokens = &v
 		}
 		for idx, msg := range messages {
-			if idx >= lastIdx {
+			if idx >= lastHistoryIdx {
 				break
 			}
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(cohere.Message)
-			chunks := msg.ToCohere(v)
-			chatReq.ChatHistory = append(chatReq.ChatHistory, v)
-			if len(chunks) > 0 {
-				chatReq.ChatHistory = append(chatReq.ChatHistory, chunks...)
-			}
+			var v cohere.Message
+			cohereClt.ConvertMessageFrom(&msg, &v)
+			chatReq.ChatHistory = append(chatReq.ChatHistory, &v)
 		}
 		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
 		return ch, stream, mergeResp, nil
-	case instructor.SchemaStreamInstructor[gemini.Request, geminiAPI.GenerateContentResponse, *geminiAPI.Content]:
+	case instructor.SchemaStreamInstructor[geminiClt.Request, geminiAPI.GenerateContentResponse]:
 		llmResp := new(geminiAPI.GenerateContentResponse)
 		mergeResp := func(resp *components.LLMResponse) {
 			if resp == nil {
@@ -1134,114 +648,26 @@ func (a *Agent[I, O]) schemaStream(ctx context.Context, userInput *I) (<-chan an
 			Model: a.model,
 		}
 		{
-
-			v := new(geminiAPI.Content)
-			sysMsg.ToGemini(v)
-			chatReq.System = v
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&sysMsg, &v)
+			chatReq.System = &v
 		}
 		chatReq.History = make([]*geminiAPI.Content, 0, len(history))
 		for _, msg := range history {
-			if msg.Mode() == "" {
-				msg.SetMode(a.client.Mode())
-			}
-			v := new(geminiAPI.Content)
-			chunks := msg.ToGemini(v)
-			chatReq.History = append(chatReq.History, v)
-			if len(chunks) > 0 {
-				chatReq.History = append(chatReq.History, chunks...)
-			}
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&msg, &v)
+			chatReq.History = append(chatReq.History, &v)
 		}
-		if userInput != nil {
-			v := new(geminiAPI.Content)
-			userMsg := components.NewMessage(components.UserRole, *userInput)
-			chunks := userMsg.ToGemini(v)
-			if l := len(chunks); l > 0 {
-				chatReq.History = append(chatReq.History, v)
-				if l > 1 {
-					chatReq.History = append(chatReq.History, chunks[:l-1]...)
-				}
-				chatReq.Parts = append(chatReq.Parts, chunks[l].Parts...)
-			} else {
-				chatReq.Parts = append(chatReq.Parts, v.Parts...)
-			}
+		{
+			var v geminiAPI.Content
+			geminiClt.ConvertMessageFrom(&inputMsg, &v)
+			chatReq.Parts = append(chatReq.Parts, v.Parts...)
 		}
 		ch, stream, err := clt.SchemaStream(ctx, &chatReq, responseType, llmResp)
 		if err != nil {
 			return nil, nil, mergeResp, err
 		}
-		out := make(chan any)
-		streamOut := make(chan instructor.StreamData)
-		go func() {
-			defer close(out)
-			defer close(streamOut)
-			var (
-				chClosed     bool
-				streamClosed bool
-			)
-			for {
-				select {
-				case part, ok := <-stream:
-					if ok {
-						streamOut <- part
-					} else {
-						streamClosed = true
-					}
-				case part, ok := <-ch:
-					if ok {
-						out <- part
-					} else {
-						chClosed = true
-					}
-				}
-				if streamClosed && chClosed {
-					break
-				}
-			}
-			if memory := clt.Memory(); memory != nil {
-				for _, v := range memory.List() {
-					var role components.MessageRole
-					msg := new(components.Message)
-					switch v.Role {
-					case geminiAPI.RoleModel:
-						role = components.AssistantRole
-						var tools []components.ToolCall
-						for _, part := range v.Parts {
-							if call := part.FunctionCall; call != nil {
-								bs, _ := json.Marshal(call.Args)
-								tools = append(tools, components.ToolCall{
-									ID:        call.ID,
-									Name:      call.Name,
-									Arguments: string(bs),
-								})
-							}
-						}
-						if len(tools) > 0 {
-							msg.SetToolCalls(tools)
-						}
-					case geminiAPI.RoleUser:
-						role = components.UserRole
-						var calls []components.ToolCallback
-						for _, part := range v.Parts {
-							if fn := part.FunctionResponse; fn != nil {
-								bs, _ := json.Marshal(fn.Response)
-								calls = append(calls, components.ToolCallback{
-									ID:      fn.ID,
-									Name:    fn.Name,
-									Content: string(bs),
-								})
-							}
-						}
-						if len(calls) > 0 {
-							msg.SetToolCallbacks(calls)
-						}
-					}
-					msg.SetRole(role)
-					msg.SetRaw(v)
-					a.memory.AddMessage(msg)
-				}
-			}
-		}()
-		return out, streamOut, mergeResp, nil
+		return ch, stream, mergeResp, nil
 	}
 	return nil, nil, nil, errors.New("unknown instructor provider")
 }
@@ -1260,55 +686,6 @@ func (a *Agent[I, O]) Run(ctx context.Context, userInput *I, output *O, apiResp 
 		}
 		return err
 	}
-	// msg := components.NewMessage(components.AssistantRole, *output)
-	// msg.SetMode(a.client.Mode())
-	// switch t := apiResp.Details.(type) {
-	// case *openai.ChatCompletion:
-	// 	if len(t.Choices) > 0 {
-	// 		choice := t.Choices[0]
-	// 		if toolCalls := choice.Message.ToolCalls; len(toolCalls) > 0 {
-	// 			bs, _ := json.Marshal(toolCalls)
-	// 			msg.SetRawContent(string(bs))
-	// 		} else {
-	// 			msg.SetRawContent(choice.Message.Content)
-	// 		}
-	// 	}
-	// case *anthropic.MessagesResponse:
-	// 	for _, content := range t.Content {
-	// 		if content.Type == anthropic.MessagesContentTypeToolUse {
-	// 			bs, _ := json.Marshal(content.MessageContentToolUse)
-	// 			msg.SetRawContent(string(bs))
-	// 			break
-	// 		} else if text := content.Text; text != nil && *text != "" {
-	// 			msg.SetRawContent(*text)
-	// 			break
-	// 		}
-	// 	}
-	// case *cohere.NonStreamedChatResponse:
-	// 	if toolCalls := t.ToolCalls; len(toolCalls) > 0 {
-	// 		bs, _ := json.Marshal(toolCalls)
-	// 		msg.SetRawContent(string(bs))
-	// 	} else {
-	// 		msg.SetRawContent(t.Text)
-	// 	}
-	// case *geminiAPI.GenerateContentResponse:
-	// 	for _, candidate := range t.Candidates {
-	// 		if candidate == nil {
-	// 			continue
-	// 		}
-	// 		for _, part := range candidate.Content.Parts {
-	// 			if toolCall := part.FunctionCall; toolCall != nil {
-	// 				bs, _ := json.Marshal(toolCall)
-	// 				msg.SetRawContent(string(bs))
-	// 				break
-	// 			} else if txt := part.Text; txt != "" {
-	// 				msg.SetRawContent(txt)
-	// 				break
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// a.memory.AddMessage(msg)
 	if fn := a.endHook; fn != nil {
 		fn(ctx, a, userInput, output, apiResp)
 	}
@@ -1332,9 +709,6 @@ func (a *Agent[I, O]) RunAnonymous(ctx context.Context, userInput any, apiResp *
 func (a *Agent[I, O]) Stream(ctx context.Context, userInput *I) (<-chan instructor.StreamData, MergeResponse, error) {
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
-	}
-	if userInput != nil {
-		a.memory.NewTurn()
 	}
 	ch, mergeResp, err := a.stream(ctx, userInput)
 	if err != nil {
@@ -1366,9 +740,6 @@ func (a *Agent[I, O]) SchemaStream(ctx context.Context, userInput *I) (<-chan an
 	if fn := a.startHook; fn != nil {
 		fn(ctx, a, userInput)
 	}
-	if userInput != nil {
-		a.memory.NewTurn()
-	}
 	ch, stream, mergeResp, err := a.schemaStream(ctx, userInput)
 	if err != nil {
 		if fn := a.errorHook; fn != nil {
@@ -1380,10 +751,6 @@ func (a *Agent[I, O]) SchemaStream(ctx context.Context, userInput *I) (<-chan an
 		fn(ctx, a, userInput, nil, nil)
 	}
 	return ch, stream, mergeResp, nil
-}
-
-func (a *Agent[I, O]) NewMessage(role components.MessageRole, content schema.Schema) *components.Message {
-	return a.memory.NewMessage(role, content)
 }
 
 // SystemPromptContextProvider returns agent systemPromptGenerator's context provider

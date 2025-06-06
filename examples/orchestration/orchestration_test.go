@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/bububa/atomic-agents/agents"
-	"github.com/bububa/atomic-agents/components"
 	"github.com/bububa/atomic-agents/components/systemprompt/cot"
 	"github.com/bububa/atomic-agents/examples"
 	"github.com/bububa/atomic-agents/schema"
@@ -76,7 +75,6 @@ func Example_orchestration() {
 	defer cancel()
 	srv := startSearxngServer(mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
-	mem := components.NewMemory(10)
 
 	systemPromptGenerator := cot.New(
 		cot.WithBackground([]string{
@@ -104,7 +102,6 @@ func Example_orchestration() {
 	finalOutput := new(FinalAnswer)
 	finalAgent := agents.NewToolAgent[Input, Output, FinalAnswer](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),
@@ -130,7 +127,6 @@ func Example_orchestration() {
 			return
 		}
 		fmt.Printf("Agent: %s\n", finalOutput.FinalAnswer)
-		finalAgent.ResetMemory()
 	}
 	// Outputs:
 	// Agent: Final Answer is I will search for the winner of the Nobel Prize in Physics in 2024.

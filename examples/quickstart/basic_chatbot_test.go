@@ -15,11 +15,8 @@ import (
 
 func Example_basicChatbot() {
 	ctx := context.Background()
-	mem := components.NewMemory(10)
-	initMsg := mem.NewMessage(components.AssistantRole, schema.CreateOutput("Hello! How can I assist you today?"))
 	agent := agents.NewAgent[schema.Input, schema.Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI, instructor.ModeJSON)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithTemperature(1),
 		agents.WithMaxTokens(1000))
@@ -32,7 +29,6 @@ func Example_basicChatbot() {
 	}
 	fmt.Println(agent.SystemPrompt())
 	fmt.Println("")
-	fmt.Printf("Agent: %s\n", initMsg.Content().(schema.Output).ChatMessage)
 	fmt.Printf("User: %s\n", input.ChatMessage)
 	fmt.Printf("Agent: %s\n", output.ChatMessage)
 	// Output:

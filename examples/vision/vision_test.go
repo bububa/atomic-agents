@@ -71,7 +71,6 @@ type Output struct {
 func Example_vision() {
 	ctx := context.Background()
 	fmt.Println("Analyzing nutrition labels...")
-	mem := components.NewMemory(10)
 	systemPromptGenerator := cot.New(
 		cot.WithBackground([]string{
 			"You are a specialized nutrition label analyzer.",
@@ -96,7 +95,6 @@ func Example_vision() {
 	)
 	agent := agents.NewAgent[Input, Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_VISION_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(0.5),

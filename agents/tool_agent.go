@@ -36,19 +36,14 @@ func (t *ToolAgent[I, T, O]) SetTool(tool tools.AnonymousTool) *ToolAgent[I, T, 
 	return t
 }
 
-func (t *ToolAgent[I, T, O]) ResetMemory() {
-	t.start.ResetMemory()
-	t.end.ResetMemory()
-}
-
 func (t *ToolAgent[I, T, O]) SetClient(clt instructor.Instructor) {
 	t.start.client = clt
 	t.end.client = clt
 }
 
-func (t *ToolAgent[I, T, O]) SetMemory(m *components.Memory) {
-	t.start.memory = m
-	t.end.memory = m
+func (t *ToolAgent[I, T, O]) SetMemory(m *instructor.Memory) {
+	t.start.SetMemory(m)
+	t.end.SetMemory(m)
 }
 
 func (t *ToolAgent[I, T, O]) SetSystemPromptGenerator(g systemprompt.Generator) {
@@ -163,14 +158,12 @@ func (t *ToolAgent[I, T, O]) Run(ctx context.Context, userInput *I, output *O, a
 				fn(ctx, t, userInput, apiResp, err)
 			}
 			return err
-		} else if outO, ok := toolResult.(schema.Schema); !ok {
+		} else if _, ok := toolResult.(schema.Schema); !ok {
 			err := errors.New("invalid agent output schema")
 			if fn := t.errorHook; fn != nil {
 				fn(ctx, t, userInput, apiResp, err)
 			}
 			return err
-		} else {
-			t.end.NewMessage(components.SystemRole, outO)
 		}
 	}
 	if err := t.end.Run(ctx, userInput, output, apiResp); err != nil {

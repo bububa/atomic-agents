@@ -16,8 +16,6 @@ import (
 
 func Example_basicCustomChatbot() {
 	ctx := context.Background()
-	mem := components.NewMemory(10)
-	initMsg := mem.NewMessage(components.AssistantRole, schema.CreateOutput("How do you do? What can I do for you? Tell me, pray, what is your need today?"))
 	systemPromptGenerator := cot.New(
 		cot.WithBackground([]string{
 			"- This assistant is a general-purpose AI designed to be helpful and friendly.",
@@ -32,7 +30,6 @@ func Example_basicCustomChatbot() {
 	)
 	agent := agents.NewAgent[schema.Input, schema.Output](
 		agents.WithClient(examples.NewInstructor(instructor.ProviderOpenAI)),
-		agents.WithMemory(mem),
 		agents.WithModel(os.Getenv("OPENAI_MODEL")),
 		agents.WithSystemPromptGenerator(systemPromptGenerator),
 		agents.WithTemperature(1),
@@ -46,7 +43,6 @@ func Example_basicCustomChatbot() {
 	}
 	fmt.Println(agent.SystemPrompt())
 	fmt.Println("")
-	fmt.Printf("Agent: %s\n", initMsg.Content().(schema.Output).ChatMessage)
 	fmt.Printf("User: %s\n", input.ChatMessage)
 	fmt.Printf("Agent: %s\n", output.ChatMessage)
 	// Output:

@@ -8,13 +8,12 @@ require (
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.0
-	github.com/bububa/instructor-go v1.5.6
+	github.com/bububa/instructor-go v1.5.9
 	github.com/bububa/mdencoder v1.0.1
 	github.com/clipperhouse/uax29 v1.14.3
 	github.com/cohere-ai/cohere-go/v2 v2.14.1
 	github.com/dgrr/quickxml v0.0.0-20201022091424-4977de546d6c
 	github.com/fumiama/go-docx v0.0.0-20250506085032-0c30fd09304b
-	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/uuid v1.6.0
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
@@ -23,7 +22,6 @@ require (
 	github.com/openai/openai-go v1.3.0
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/pkoukk/tiktoken-go v0.1.7
-	github.com/rs/xid v1.6.0
 	github.com/xuri/excelize/v2 v2.9.1
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a
 	go.uber.org/atomic v1.11.0
@@ -57,6 +55,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fumiama/imgsz v0.0.4 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
 	github.com/getsentry/sentry-go v0.33.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -104,12 +103,12 @@ require (
 	go.opentelemetry.io/otel v1.36.0 // indirect
 	go.opentelemetry.io/otel/metric v1.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/image v0.27.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/api v0.236.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc v1.72.2 // indirect
