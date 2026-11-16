@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-func Exp(args ...interface{}) (interface{}, error) {
+func Exp(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -15,7 +15,7 @@ func Exp(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Exp2(args ...interface{}) (interface{}, error) {
+func Exp2(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {

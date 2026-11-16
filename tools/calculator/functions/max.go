@@ -1,6 +1,6 @@
 package functions
 
-func Max(args ...interface{}) (interface{}, error) {
+func Max(args ...any) (any, error) {
 	if len(args) > 0 {
 		var floatMax float64
 		for idx, arg := range args {
@@ -19,7 +19,7 @@ func Max(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Min(args ...interface{}) (interface{}, error) {
+func Min(args ...any) (any, error) {
 	if len(args) > 0 {
 		var floatMax float64
 		for idx, arg := range args {

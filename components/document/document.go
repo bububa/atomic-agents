@@ -124,6 +124,6 @@ func (s *FileInfo) IsDir() bool {
 }
 
 // Sys returns the underlying data source (can return nil).
-func (s *FileInfo) Sys() interface{} {
+func (s *FileInfo) Sys() any {
 	return nil
 }

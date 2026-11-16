@@ -2,7 +2,6 @@ package searxng
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,8 +40,7 @@ func TestSearxngSearchWithCategory(t *testing.T) {
 	mockResult := Output{
 		Results: []SearchResultItem{mockItem},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
@@ -85,8 +83,7 @@ func TestSearxngSearchMissingFields(t *testing.T) {
 			{Title: "Valid Result", Content: "Some content", URL: "https://example.com/5", Query: mockQuery},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
@@ -120,8 +117,7 @@ func TestSearxngSearchWithMetadataAndPublishedDate(t *testing.T) {
 			{Title: "Result without dates", Content: "Content without dates", URL: "https://example.com/no-dates", Query: mockQuery},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
@@ -161,8 +157,7 @@ func TestSearxngSearchWithMaxResults(t *testing.T) {
 			{Title: "Result without dates", Content: "Content without dates", URL: "https://example.com/no-dates", Query: mockQuery},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool
@@ -185,8 +180,7 @@ func TestSearxngSearchWithNoResults(t *testing.T) {
 	mockResult := Output{
 		Results: []SearchResultItem{},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	srv := startSearxngServer(t, mockPort, &mockResult)
 	defer srv.Shutdown(ctx)
 	// Initialize the tool

@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-var constParams = map[string]interface{}{
+var constParams = map[string]any{
 	"pi":      math.Pi,
 	"e":       math.E,
 	"phi":     math.Phi,

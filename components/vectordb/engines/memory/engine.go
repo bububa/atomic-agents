@@ -132,9 +132,7 @@ func filterRecords(docs []vectordb.Record, opts *vectordb.SearchOptions) []vecto
 
 	wg := sync.WaitGroup{}
 	for range concurrency {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for doc := range docChan {
 				if recordMatchesFilters(&doc, opts) {
 					filteredDocsLock.Lock()
@@ -142,7 +140,7 @@ func filterRecords(docs []vectordb.Record, opts *vectordb.SearchOptions) []vecto
 					filteredDocsLock.Unlock()
 				}
 			}
-		}()
+		})
 	}
 
 	for _, doc := range docs {

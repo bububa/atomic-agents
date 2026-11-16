@@ -669,7 +669,7 @@ func (mc *markdownContext) splitInline(inline *markdown.Inline) string {
 		return inline.Content
 	}
 
-	var content string
+	var content strings.Builder
 
 	var currentLink *markdown.LinkOpen
 
@@ -686,39 +686,39 @@ func (mc *markdownContext) splitInline(inline *markdown.Inline) string {
 	for _, child := range inline.Children {
 		switch token := child.(type) {
 		case *markdown.Softbreak:
-			content += "\n"
+			content.WriteString("\n")
 		case *markdown.Hardbreak:
 			// CommonMark Spec 6.7: Hard line breaks
 			// For a more visible alternative, a backslash before the line
 			// ending may be used instead of two or more spaces
-			content += "\\\n"
+			content.WriteString("\\\n")
 		case *markdown.StrongOpen, *markdown.StrongClose:
-			content += "**"
+			content.WriteString("**")
 		case *markdown.EmphasisOpen, *markdown.EmphasisClose:
-			content += "*"
+			content.WriteString("*")
 		case *markdown.StrikethroughOpen, *markdown.StrikethroughClose:
-			content += "~~"
+			content.WriteString("~~")
 		case *markdown.Text:
-			content += token.Content
+			content.WriteString(token.Content)
 		case *markdown.HTMLInline:
-			content += token.Content
+			content.WriteString(token.Content)
 		case *markdown.CodeInline:
-			content += fmt.Sprintf("`%s`", token.Content)
+			content.WriteString(fmt.Sprintf("`%s`", token.Content))
 		case *markdown.LinkOpen:
-			content += "["
+			content.WriteString("[")
 			// CommonMark Spec 6.3:
 			// Links may not contain other links, at any level of nesting.
 			// If multiple otherwise valid link definitions appear nested
 			// inside each other, the inner-most definition is used.
 			currentLink = token
 		case *markdown.LinkClose:
-			content += mc.inlineOnLinkClose(currentLink)
+			content.WriteString(mc.inlineOnLinkClose(currentLink))
 		case *markdown.Image:
-			content += mc.inlineOnImage(token)
+			content.WriteString(mc.inlineOnImage(token))
 		}
 	}
 
-	return content
+	return content.String()
 }
 
 func (mc *markdownContext) inlineOnLinkClose(link *markdown.LinkOpen) string {
@@ -733,7 +733,7 @@ func (mc *markdownContext) inlineOnLinkClose(link *markdown.LinkOpen) string {
 }
 
 func (mc *markdownContext) inlineOnImage(image *markdown.Image) string {
-	var label string
+	var label strings.Builder
 
 	// CommonMark spec 6.4: Images
 	// Though this spec is concerned with parsing, not rendering, it is
@@ -741,28 +741,28 @@ func (mc *markdownContext) inlineOnImage(image *markdown.Image) string {
 	// of the image description be used.
 	for _, token := range image.Tokens {
 		if text, ok := token.(*markdown.Text); ok {
-			label += text.Content
+			label.WriteString(text.Content)
 		}
 	}
 
 	if image.Title == "" {
-		return fmt.Sprintf(`![%s](%s)`, label, image.Src)
+		return fmt.Sprintf(`![%s](%s)`, label.String(), image.Src)
 	}
 
-	return fmt.Sprintf(`![%s](%s "%s")`, label, image.Src, image.Title)
+	return fmt.Sprintf(`![%s](%s "%s")`, label.String(), image.Src, image.Title)
 }
 
 // closeTypes represents the close operation type for each open operation type.
 var closeTypes = map[reflect.Type]reflect.Type{ //nolint:gochecknoglobals
-	reflect.TypeOf(&markdown.HeadingOpen{}):     reflect.TypeOf(&markdown.HeadingClose{}),
-	reflect.TypeOf(&markdown.BulletListOpen{}):  reflect.TypeOf(&markdown.BulletListClose{}),
-	reflect.TypeOf(&markdown.OrderedListOpen{}): reflect.TypeOf(&markdown.OrderedListClose{}),
-	reflect.TypeOf(&markdown.ParagraphOpen{}):   reflect.TypeOf(&markdown.ParagraphClose{}),
-	reflect.TypeOf(&markdown.BlockquoteOpen{}):  reflect.TypeOf(&markdown.BlockquoteClose{}),
-	reflect.TypeOf(&markdown.ListItemOpen{}):    reflect.TypeOf(&markdown.ListItemClose{}),
-	reflect.TypeOf(&markdown.TableOpen{}):       reflect.TypeOf(&markdown.TableClose{}),
-	reflect.TypeOf(&markdown.TheadOpen{}):       reflect.TypeOf(&markdown.TheadClose{}),
-	reflect.TypeOf(&markdown.TbodyOpen{}):       reflect.TypeOf(&markdown.TbodyClose{}),
+	reflect.TypeFor[*markdown.HeadingOpen]():     reflect.TypeFor[*markdown.HeadingClose](),
+	reflect.TypeFor[*markdown.BulletListOpen]():  reflect.TypeFor[*markdown.BulletListClose](),
+	reflect.TypeFor[*markdown.OrderedListOpen](): reflect.TypeFor[*markdown.OrderedListClose](),
+	reflect.TypeFor[*markdown.ParagraphOpen]():   reflect.TypeFor[*markdown.ParagraphClose](),
+	reflect.TypeFor[*markdown.BlockquoteOpen]():  reflect.TypeFor[*markdown.BlockquoteClose](),
+	reflect.TypeFor[*markdown.ListItemOpen]():    reflect.TypeFor[*markdown.ListItemClose](),
+	reflect.TypeFor[*markdown.TableOpen]():       reflect.TypeFor[*markdown.TableClose](),
+	reflect.TypeFor[*markdown.TheadOpen]():       reflect.TypeFor[*markdown.TheadClose](),
+	reflect.TypeFor[*markdown.TbodyOpen]():       reflect.TypeFor[*markdown.TbodyClose](),
 }
 
 // indexOfCloseTag returns the index of the close tag for the open tag at startAt.
@@ -810,7 +810,7 @@ func tableHeaderInMarkdown(header []string) string {
 
 	// add separator
 	var separators []string
-	for i := 0; i < len(header); i++ {
+	for range header {
 		separators = append(separators, "---")
 	}
 
@@ -822,13 +822,13 @@ func tableHeaderInMarkdown(header []string) string {
 
 // tableRowInMarkdown represents the Markdown format for table row.
 func tableRowInMarkdown(row []string) string {
-	var line string
+	var line strings.Builder
 	for i := range row {
-		line += fmt.Sprintf("| %s ", row[i])
+		line.WriteString(fmt.Sprintf("| %s ", row[i]))
 		if i == len(row)-1 {
-			line += "|"
+			line.WriteString("|")
 		}
 	}
 
-	return line
+	return line.String()
 }

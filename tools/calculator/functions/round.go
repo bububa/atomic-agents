@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-func Floor(args ...interface{}) (interface{}, error) {
+func Floor(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -15,7 +15,7 @@ func Floor(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Ceil(args ...interface{}) (interface{}, error) {
+func Ceil(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -26,7 +26,7 @@ func Ceil(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Round(args ...interface{}) (interface{}, error) {
+func Round(args ...any) (any, error) {
 	switch len(args) {
 	case 1:
 		v, ok := ToFloat64(args[0])
@@ -66,7 +66,7 @@ func Round(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Trunc(args ...interface{}) (interface{}, error) {
+func Trunc(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {

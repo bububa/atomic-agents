@@ -1,6 +1,8 @@
 package functions
 
 import (
+	"maps"
+
 	"github.com/Knetic/govaluate"
 )
 
@@ -48,10 +50,6 @@ var Functions map[string]govaluate.ExpressionFunction
 
 func init() {
 	Functions = make(map[string]govaluate.ExpressionFunction)
-	for k, v := range MathFunctions {
-		Functions[k] = v
-	}
-	for k, v := range FlowFunctions {
-		Functions[k] = v
-	}
+	maps.Copy(Functions, MathFunctions)
+	maps.Copy(Functions, FlowFunctions)
 }

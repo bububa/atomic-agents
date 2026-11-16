@@ -1,6 +1,6 @@
 package functions
 
-func IsDefined(args ...interface{}) (interface{}, error) {
+func IsDefined(args ...any) (any, error) {
 	if len(args) == 1 {
 		if args[0] != nil {
 			switch v := args[0].(type) {

@@ -3,6 +3,7 @@ package calculator
 import (
 	"context"
 	"errors"
+	"maps"
 
 	"github.com/Knetic/govaluate"
 
@@ -20,10 +21,10 @@ type Input struct {
 	// Expression Mathematical expression to evaluate. For example, '2 + 2'.
 	Expression string `json:"expression" jsonschema:"title=expression,description=Mathematical expression to evaluate. For example, '2 + 2'."`
 	// Params represents expressions's parameters
-	Params map[string]interface{} `json:"params,omitempty" jsonschema:"title=params,description=Parameters for the expression."`
+	Params map[string]any `json:"params,omitempty" jsonschema:"title=params,description=Parameters for the expression."`
 }
 
-func NewInput(exp string, params map[string]interface{}) *Input {
+func NewInput(exp string, params map[string]any) *Input {
 	return &Input{
 		Expression: exp,
 		Params:     params,
@@ -34,10 +35,10 @@ func NewInput(exp string, params map[string]interface{}) *Input {
 type Output struct {
 	schema.Base
 	// Result Result of the calculation
-	Result interface{} `json:"result,omitempty" jsonschema:"title=result,description=Result of the calculation."`
+	Result any `json:"result,omitempty" jsonschema:"title=result,description=Result of the calculation."`
 }
 
-func NewOutput(result interface{}) *Output {
+func NewOutput(result any) *Output {
 	return &Output{
 		Result: result,
 	}
@@ -64,10 +65,8 @@ func (t *Tool) Run(ctx context.Context, input *Input, output *Output) error {
 	if err != nil {
 		return err
 	}
-	params := make(map[string]interface{}, len(input.Params)+len(constParams))
-	for k, v := range input.Params {
-		params[k] = v
-	}
+	params := make(map[string]any, len(input.Params)+len(constParams))
+	maps.Copy(params, input.Params)
 	for k, v := range constParams {
 		if _, ok := params[k]; ok {
 			continue

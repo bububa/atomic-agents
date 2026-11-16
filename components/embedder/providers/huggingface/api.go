@@ -19,7 +19,7 @@ type options struct {
 
 type EmbeddingRequest struct {
 	Inputs  []string `json:"inputs,omitempty"`
-	Options options  `json:"options,omitempty"`
+	Options options  `json:"options"`
 	Model   string   `json:"-"`
 }
 

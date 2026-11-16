@@ -86,11 +86,9 @@ func NewHttp(opts ...HttpOption) (*Http, error) {
 		httpReq: httpReq,
 		url:     cfg.url,
 		reader:  new(bytes.Reader),
-		Content: Content{
-			meta: map[string]string{
-				"url":    cfg.url,
-				"method": cfg.method,
-			},
+		meta: map[string]string{
+			"url":    cfg.url,
+			"method": cfg.method,
 		},
 	}, nil
 }

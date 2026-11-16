@@ -4,20 +4,22 @@ import (
 	"context"
 	"encoding/json"
 
-	milvusClient "github.com/milvus-io/milvus-sdk-go/v2/client"
-	"github.com/milvus-io/milvus-sdk-go/v2/entity"
+	"github.com/milvus-io/milvus/client/v3/column"
+	"github.com/milvus-io/milvus/client/v3/entity"
+	"github.com/milvus-io/milvus/client/v3/index"
+	milvusClient "github.com/milvus-io/milvus/client/v3/milvusclient"
 
 	"github.com/bububa/atomic-agents/components/vectordb"
 )
 
 type Engine struct {
-	db milvusClient.Client
+	db *milvusClient.Client
 	vectordb.Options
 }
 
 var _ vectordb.Engine = (*Engine)(nil)
 
-func New(db milvusClient.Client, opts ...vectordb.Option) *Engine {
+func New(db *milvusClient.Client, opts ...vectordb.Option) *Engine {
 	ret := &Engine{
 		db: db,
 	}
@@ -34,14 +36,16 @@ func (e *Engine) CreateCollection(ctx context.Context, name string, dim int64) e
 	contentField := entity.NewField().WithName("content").WithDataType(entity.FieldTypeString)
 	metaField := entity.NewField().WithName("meta").WithDataType(entity.FieldTypeJSON).WithIsDynamic(true)
 	schema := entity.NewSchema().WithName(name).WithAutoID(false).WithField(idField).WithField(vectorField).WithField(contentField).WithField(metaField)
-	if err := e.db.CreateCollection(ctx, schema, 0); err != nil {
+	if err := e.db.CreateCollection(ctx, milvusClient.NewCreateCollectionOption("vector", schema)); err != nil {
 		return err
 	}
-	idxHnsw, err := entity.NewIndexHNSW(entity.COSINE, 8, 200)
+	idxHnsw := index.NewHNSWIndex(entity.COSINE, 8, 200)
+	idxOpt := milvusClient.NewCreateIndexOption(name, "embedding", idxHnsw).WithIndexName("embedding_idx")
+	task, err := e.db.CreateIndex(ctx, idxOpt)
 	if err != nil {
 		return err
 	}
-	return e.db.CreateIndex(ctx, name, "embedding", idxHnsw, true, milvusClient.WithIndexName("embedding_idx"))
+	return task.Await(ctx)
 }
 
 func (e *Engine) Insert(ctx context.Context, collectionName string, records ...vectordb.Record) error {
@@ -49,48 +53,50 @@ func (e *Engine) Insert(ctx context.Context, collectionName string, records ...v
 		return nil
 	}
 	dim := int64(len(records[0].Embedding.Embedding))
-	if exists, err := e.db.HasCollection(ctx, collectionName); err != nil {
+	hasCollectionOpt := milvusClient.NewHasCollectionOption(collectionName)
+	if exists, err := e.db.HasCollection(ctx, hasCollectionOpt); err != nil {
 		return err
 	} else if !exists {
 		if err := e.CreateCollection(ctx, collectionName, dim); err != nil {
 			return err
 		}
 	}
-	columnsMap := make(map[string]entity.Column, 4)
+	columnsMap := make(map[string]column.Column, 4)
 	for _, record := range records {
 		if record.ID == "" {
 			record.ID = record.Embedding.UUID()
 		}
 		if col, ok := columnsMap["id"]; !ok {
-			columnsMap["id"] = entity.NewColumnVarChar("id", []string{record.ID})
+			columnsMap["id"] = column.NewColumnVarChar("id", []string{record.ID})
 		} else {
 			col.AppendValue(record.ID)
 		}
 		vector := vectordb.Float32s(record.Embedding.Embedding)
 		if col, ok := columnsMap["embedding"]; !ok {
-			columnsMap["embedding"] = entity.NewColumnFloatVector("embedding", int(dim), [][]float32{vector})
+			columnsMap["embedding"] = column.NewColumnFloatVector("embedding", int(dim), [][]float32{vector})
 		} else {
 			col.AppendValue(vector)
 		}
 		if col, ok := columnsMap["content"]; !ok {
-			columnsMap["content"] = entity.NewColumnString("content", []string{record.Embedding.Object})
+			columnsMap["content"] = column.NewColumnString("content", []string{record.Embedding.Object})
 		} else {
 			col.AppendValue(record.Embedding.Object)
 		}
 		if record.Embedding.Meta != nil {
 			bs, _ := json.Marshal(record.Embedding.Meta)
 			if col, ok := columnsMap["meta"]; !ok {
-				columnsMap["meta"] = entity.NewColumnJSONBytes("meta", [][]byte{bs})
+				columnsMap["meta"] = column.NewColumnJSONBytes("meta", [][]byte{bs})
 			} else {
 				col.AppendValue(bs)
 			}
 		}
 	}
-	columns := make([]entity.Column, 0, len(columnsMap))
+	columns := make([]column.Column, 0, len(columnsMap))
 	for _, col := range columnsMap {
 		columns = append(columns, col)
 	}
-	_, err := e.db.Insert(ctx, collectionName, "", columns...)
+	insertOpt := milvusClient.NewColumnBasedInsertOption(collectionName, columns...)
+	_, err := e.db.Insert(ctx, insertOpt)
 	return err
 }
 
@@ -100,7 +106,10 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 	for _, opt := range opts {
 		opt(&option)
 	}
-	if err := e.db.LoadCollection(ctx, option.Collection, false); err != nil {
+	loadOpt := milvusClient.NewLoadCollectionOption(option.Collection)
+	if task, err := e.db.LoadCollection(ctx, loadOpt); err != nil {
+		return nil, err
+	} else if err := task.Await(ctx); err != nil {
 		return nil, err
 	}
 	query := entity.FloatVector(vectordb.Float32s(vectors))
@@ -108,11 +117,9 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 	if topK == 0 {
 		topK = e.TopK
 	}
-	searchParams, err := entity.NewIndexHNSWSearchParam(topK)
-	if err != nil {
-		return nil, err
-	}
-	results, err := e.db.Search(ctx, option.Collection, nil, "", []string{}, []entity.Vector{query}, "embedding", entity.COSINE, topK, searchParams)
+	searchParams := index.NewHNSWAnnParam(topK)
+	searchOpt := milvusClient.NewSearchOption(option.Collection, topK, []entity.Vector{entity.Vector(query)}).WithANNSField("emmbedding").WithAnnParam(searchParams)
+	results, err := e.db.Search(ctx, searchOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -125,12 +132,12 @@ func (e *Engine) Search(ctx context.Context, vectors []float64, opts ...vectordb
 	return searchResults, nil
 }
 
-func searchResultToRecord(result *milvusClient.SearchResult, record *vectordb.Record) {
+func searchResultToRecord(result *milvusClient.ResultSet, record *vectordb.Record) {
 	if len(result.Scores) > 0 {
 		record.Score = float64(result.Scores[0])
 	}
 	for _, colKey := range []string{"id", "content", "embedding", "meta"} {
-		if col := result.Fields.GetColumn(colKey); col != nil {
+		if col := result.GetColumn(colKey); col != nil {
 			switch colKey {
 			case "id":
 				record.ID, _ = col.GetAsString(0)

@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-func Tan(args ...interface{}) (interface{}, error) {
+func Tan(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -15,7 +15,7 @@ func Tan(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Tanh(args ...interface{}) (interface{}, error) {
+func Tanh(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -26,7 +26,7 @@ func Tanh(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Atan(args ...interface{}) (interface{}, error) {
+func Atan(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -37,7 +37,7 @@ func Atan(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Atan2(args ...interface{}) (interface{}, error) {
+func Atan2(args ...any) (any, error) {
 	if len(args) == 2 {
 		v1, ok := ToFloat64(args[0])
 		if !ok {
@@ -52,7 +52,7 @@ func Atan2(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Atanh(args ...interface{}) (interface{}, error) {
+func Atanh(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {

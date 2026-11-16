@@ -1,6 +1,6 @@
 package functions
 
-func ToFloat64(v interface{}) (float64, bool) {
+func ToFloat64(v any) (float64, bool) {
 	switch vv := v.(type) {
 	case float64:
 		return vv, true

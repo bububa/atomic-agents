@@ -4,7 +4,7 @@ import (
 	"math"
 )
 
-func Sin(args ...interface{}) (interface{}, error) {
+func Sin(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -15,7 +15,7 @@ func Sin(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Sinh(args ...interface{}) (interface{}, error) {
+func Sinh(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -26,7 +26,7 @@ func Sinh(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Asin(args ...interface{}) (interface{}, error) {
+func Asin(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {
@@ -37,7 +37,7 @@ func Asin(args ...interface{}) (interface{}, error) {
 	return nil, WrongParamsCount
 }
 
-func Asinh(args ...interface{}) (interface{}, error) {
+func Asinh(args ...any) (any, error) {
 	if len(args) == 1 {
 		v, ok := ToFloat64(args[0])
 		if !ok {

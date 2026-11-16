@@ -75,15 +75,13 @@ type PromptOptimizer[T schema.Schema] struct {
 //   - Configured PromptOptimizer instance
 func NewPromptOptimizer[I schema.Schema](agentOpts []agents.Option, taskDesc string, opts ...OptimizerOption) *PromptOptimizer[I] {
 	optimizer := &PromptOptimizer[I]{
-		taskDesc: taskDesc,
-		OptimizerConfig: OptimizerConfig{
-			history:    []OptimizationEntry{},
-			threshold:  0.8,
-			maxRetries: 3,
-			retryDelay: time.Second * 2,
-			memorySize: 2,
-			iterations: 5,
-		},
+		taskDesc:   taskDesc,
+		history:    []OptimizationEntry{},
+		threshold:  0.8,
+		maxRetries: 3,
+		retryDelay: time.Second * 2,
+		memorySize: 2,
+		iterations: 5,
 	}
 
 	for _, opt := range opts {

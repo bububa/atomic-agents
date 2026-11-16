@@ -31,11 +31,9 @@ func NewFile(fname string) (*File, error) {
 	}
 	return &File{
 		fp: fp,
-		Content: Content{
-			meta: map[string]string{
-				"filename": fileInfo.Name(),
-				"modtime":  strconv.FormatInt(fileInfo.ModTime().Unix(), 10),
-			},
+		meta: map[string]string{
+			"filename": fileInfo.Name(),
+			"modtime":  strconv.FormatInt(fileInfo.ModTime().Unix(), 10),
 		},
 	}, nil
 }
